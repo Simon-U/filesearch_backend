@@ -14,7 +14,7 @@ phases:
     commands:
       - echo "Building the Docker image..."
       # If your Dockerfile is in a subdirectory (e.g., docker/), adjust the build context and dockerfile path accordingly.
-      - docker build -f docker/Dockerfile -t $REPOSITORY_URI:latest .
+      - docker build -f app/services/sagemaker/docker/Dockerfile -t $REPOSITORY_URI:latest
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:
