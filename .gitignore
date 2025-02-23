@@ -1,0 +1,24 @@
+# Recursively ignore all __pycache__ directories
+**/__pycache__/
+
+# Existing Python-related ignore patterns
+*.py[cod]
+*$py.class
+
+# Other existing ignores
+.env
+.python-version
+
+# Specific directories to ignore
+app/services/aws/
+tests/data/
+tests/raw_Data/
+output/
+
+# Specific large files
+output/documents.txt
+output/metadata.txt
+tests/data/documents_text.txt.env
+/tests/
+tests/
+
