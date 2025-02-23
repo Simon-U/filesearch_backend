@@ -6,8 +6,10 @@ phases:
       - echo "Installing dependencies..."
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
+      - echo "Logging in to our primary ECR repository..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
+      - echo "Logging in to the base image ECR repository in us-east-1..."
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
       - REPOSITORY_URI=$REPOSITORY_URI
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
   build:
