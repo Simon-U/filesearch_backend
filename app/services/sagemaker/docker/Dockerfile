@@ -18,8 +18,8 @@ FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 
 # Copy application code into the container
-COPY fileloader /opt/ml/code/fileloader
-COPY sagemaker/docker/inference.py /opt/ml/code/
+COPY app/services/fileloader /opt/ml/code/fileloader
+COPY app/services/sagemaker/docker/inference.py /opt/ml/code/
 
 # Set the working directory
 WORKDIR /opt/ml/code
