@@ -33,7 +33,7 @@ click==8.1.8
 cloudpathlib==0.20.0
 coloredlogs==15.0.1
 comm==0.2.2
-confection==0.1.5
+confection>=0.2.0
 cryptography==43.0.3
 cymem==2.0.11
 dataclasses-json==0.6.7
@@ -43,10 +43,10 @@ deepsearch-glm==1.0.0
 defusedxml==0.7.1
 dill==0.3.9
 distro==1.9.0
-docling==2.17.0
-docling-core==2.16.0
+docling>=2.18.0
+docling-core>=2.17.0
 docling-ibm-models==3.3.0
-docling-parse==3.1.2
+docling-parse>=3.2.0
 easyocr==1.7.2
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
 et_xmlfile==2.0.0
