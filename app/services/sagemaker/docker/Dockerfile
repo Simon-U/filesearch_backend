@@ -21,29 +21,41 @@ RUN python -m pip install --upgrade setuptools wheel
 
 # Accept GitHub token as a build argument
 ARG GITHUB_TOKEN
+# Configure Git to use HTTPS instead of SSH
+RUN git config --global url."https://".insteadOf git:// && \
+    git config --global url."https://".insteadOf ssh:// && \
+    git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 
 # Copy the requirements file from the repository root
 COPY requirements.txt /tmp/requirements.txt
 
 # Replace placeholder in requirements.txt with the actual GitHub token
 RUN if [ -n "$GITHUB_TOKEN" ]; then \
-    sed -i "s|__GITHUB_TOKEN__|$GITHUB_TOKEN|g" /tmp/requirements.txt; \
+    sed -i "s|__GITHUB_TOKEN__|${GITHUB_TOKEN}|g" /tmp/requirements.txt; \
     fi
 
-# Install PyTorch with CUDA 12.1 support and other dependencies
+# Install PyTorch with CUDA 12.1 support first
 RUN pip install --no-cache-dir \
     torch==2.5.1+cu121 \
     torchvision==0.20.1+cu121 \
     torchaudio==2.5.1+cu121 \
-    --extra-index-url https://download.pytorch.org/whl/cu121 && \
-    pip install --no-cache-dir -r /tmp/requirements.txt && \
-    pip install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cu121
+
+# Install requirements (with retry for robustness)
+RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
+    (sleep 5 && pip install --no-cache-dir -r /tmp/requirements.txt)
+
+# Install additional specific packages
+RUN pip install --no-cache-dir \
     transformers==4.48.1 \
     Pillow==10.4.0 \
     pandas==2.2.3 \
     office365-rest-python-client==2.4.1 \
     boto3==1.35.63 \
     psycopg2==2.9.10
+
+# Remove the token from the requirements file for security
+RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
 
 # Stage 2: Final lightweight image
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu20.04
