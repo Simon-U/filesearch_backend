@@ -1,6 +1,6 @@
 pydantic>=2.10.5,<3.0.0
 
-agent-toolbox @ git+https://__GITHUB_TOKEN__@github.com/Simon-U/agent-toolbox.git@d48cf125e2f9bb1da41be0b058ebadb61ee4e063
+agent-toolbox @ git+https://__GITHUB_TOKEN__@github.com/Simon-U/agent-toolbox.git
 aiohappyeyeballs==2.4.4
 aiohttp==3.11.12
 aiohttp_socks==0.10.1
