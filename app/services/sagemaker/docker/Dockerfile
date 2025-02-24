@@ -96,8 +96,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
 
-# Set environment to use virtual environment
-ENV PATH="/opt/venv/bin:$PATH"
+# Set environment to use virtual environment and ensure /usr/local/bin is in the PATH
+ENV PATH="/usr/local/bin:/opt/venv/bin:$PATH"
 
 # Copy application code
 COPY app/services/fileloader /opt/ml/code/fileloader
@@ -143,7 +143,11 @@ RUN echo '#!/bin/bash\n\
 # Set environment variables for SageMaker
 ENV SAGEMAKER_PROGRAM=inference.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
-ENV SAGEMAKER_HANDLER=inference.py
+ENV SAGEMAKER_HANDLER=inference.model_fn
 
-# Set the entry point to the serve script
-ENTRYPOINT ["serve"]
+# Override the NVIDIA entrypoint to use our serve script
+ENV NVIDIA_DISABLE_REQUIRE=true
+
+# Clear inherited entrypoint and use CMD instead
+ENTRYPOINT []
+CMD ["serve", "serve"]
