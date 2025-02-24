@@ -152,8 +152,9 @@ ENV USE_HALF_PRECISION=true
 ENV ENABLE_CAPTIONING=true
 ENV CAPTION_MODEL=Salesforce/blip-image-captioning-base
 
-# Install SageMaker serving toolkit
-RUN /opt/venv/bin/pip install --no-cache-dir sagemaker-inference flask
+# Update SageMaker toolkit installation:
+# *** Key Change: Install sagemaker-inference (not sagemaker-inference-toolkit) ***
+RUN /opt/venv/bin/pip install --no-cache-dir sagemaker-training sagemaker-inference
 
 # Create directory structure expected by SageMaker
 RUN mkdir -p /opt/ml/model

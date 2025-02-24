@@ -217,7 +217,7 @@ class SageMakerFileLoader:
         sharepoint_site_uri: str,
         image_uri: str,
         model_data_url: Optional[str] = None,
-        timeout: int = 1800
+        timeout: int = 600
     ) -> str:
         """
         Deploy a model to SageMaker endpoint with automatic cleanup
