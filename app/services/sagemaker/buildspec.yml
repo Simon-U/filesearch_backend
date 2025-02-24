@@ -19,7 +19,7 @@ phases:
       - echo "Listing app/services/sagemaker/docker directory:"
       - ls -la app/services/sagemaker/docker
       - echo "Building the Docker image with verbose output..."
-      - docker build --progress=plain -f app/services/sagemaker/docker/Dockerfile -t $REPOSITORY_URI:latest --build-arg SSH_PRIVATE_KEY="$SSH_PRIVATE_KEY" .
+      - docker build --progress=plain -f app/services/sagemaker/docker/Dockerfile -t $REPOSITORY_URI:latest --build-arg GITHUB_TOKEN="$GITHUB_TOKEN" .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:

@@ -1,4 +1,4 @@
-agent-toolbox @ git+ssh://git@github.com/Simon-U/agent-toolbox.git@2c64ea59668e7fb65eb80a8e2ae412a8e269dc59
+agent-toolbox @ git+https://__GITHUB_TOKEN__@github.com/Simon-U/agent-toolbox.git@2c64ea59668e7fb65eb80a8e2ae412a8e269dc59
 aiohappyeyeballs==2.4.4
 aiohttp==3.11.11
 aiohttp_socks==0.9.0
