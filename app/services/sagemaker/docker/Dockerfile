@@ -30,25 +30,38 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
     sed -i "s|__GITHUB_TOKEN__|$GITHUB_TOKEN|g" /tmp/requirements.txt; \
     fi
 
-# Install PyTorch with CUDA 12.1 support
+# Install PyTorch with CUDA 12.1 support and other dependencies
 RUN pip install --no-cache-dir \
-    torch==2.1.0+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.0+cu121 --index-url https://download.pytorch.org/whl/cu121 && \
+    torch==2.5.1+cu121 \
+    torchvision==0.20.1+cu121 \
+    torchaudio==2.5.1+cu121 \
+    --extra-index-url https://download.pytorch.org/whl/cu121 && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     pip install --no-cache-dir \
-    transformers==4.36.0 \
-    Pillow==10.0.0 \
-    pandas==2.1.0 \
+    transformers==4.48.1 \
+    Pillow==10.4.0 \
+    pandas==2.2.3 \
     office365-rest-python-client==2.4.1 \
-    boto3==1.28.0 \
+    boto3==1.35.63 \
     psycopg2==2.9.10
 
 # Stage 2: Final lightweight image
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu20.04
 
+# Install Python 3.11 and required system libraries in the final stage
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-dev \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy installed Python packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Rest of your Dockerfile remains the same
+# Copy application code
 COPY app/services/fileloader /opt/ml/code/fileloader
 COPY app/services/sagemaker/docker/inference.py /opt/ml/code/
 
