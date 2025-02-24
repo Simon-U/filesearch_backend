@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime AS builder
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime-py311 AS builder
 
 # Install git so that pip can clone private repositories
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
@@ -15,6 +15,9 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
     sed -i "s|__GITHUB_TOKEN__|$GITHUB_TOKEN|g" /tmp/requirements.txt; \
     fi
 
+# Upgrade pip, setuptools, and wheel to ensure smooth metadata generation
+RUN pip install --upgrade pip setuptools wheel
+
 # Install dependencies (this will use git+https URLs for private repos)
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
     pip install --no-cache-dir \
@@ -26,7 +29,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
     boto3==1.28.0
 
 # Stage 2: Final lightweight image
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime-py311
 
 # Copy installed Python packages from builder
 COPY --from=builder /opt/conda/lib/python3.10/site-packages /opt/conda/lib/python3.10/site-packages
@@ -50,7 +53,7 @@ RUN chmod -R 755 /opt/ml/code
 # Set Python path so modules are found
 ENV PYTHONPATH=/opt/ml/code
 
-# Set default environment variables for the analyzer
+# Set default environment variables for analyzer
 ENV MODEL_TYPE=transformer
 ENV MODEL_NAME=openai/clip-vit-base-patch32
 ENV CONFIDENCE_THRESHOLD=0.4
