@@ -1,12 +1,19 @@
-# Stage 1: Build dependencies with Python 3.11
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu20.04 AS builder
+# Stage 1: Build dependencies with Ubuntu 20.04 and Python 3.11
+FROM ubuntu:20.04 AS builder
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies, PostgreSQL development libraries, and Python 3.11
+# Install system dependencies and Python 3.11
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
+    wget \
+    gnupg \
+    ca-certificates \
+    git \
+    curl \
+    build-essential \
+    libpq-dev \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
@@ -14,13 +21,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11-venv \
     python3.11-distutils \
     python3-pip \
-    python3-setuptools \
-    git \
-    wget \
-    curl \
-    build-essential \
-    libpq-dev \
+    python3-setuptools
+
+# Install CUDA toolkit
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb \
+    && dpkg -i cuda-keyring_1.0-1_all.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    cuda-toolkit-12-1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Set CUDA environment variables
+ENV PATH="/usr/local/cuda-12.1/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
 
 # Create directory for virtual environment
 RUN mkdir -p /opt/venv
@@ -78,7 +91,7 @@ RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt || \
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
 
 # Stage 2: Final lightweight image
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu20.04
+FROM ubuntu:20.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -86,18 +99,32 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install Python 3.11 and required system libraries in the final stage
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
+    wget \
+    gnupg \
+    ca-certificates \
+    libpq5 \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
-    python3.11-venv \
-    libpq5 \
+    python3.11-venv
+
+# Install CUDA runtime only (not full toolkit)
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb \
+    && dpkg -i cuda-keyring_1.0-1_all.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    cuda-runtime-12-1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Set CUDA environment variables
+ENV PATH="/usr/local/cuda-12.1/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
 
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
 
-# Set environment to use virtual environment and ensure /usr/local/bin is in the PATH
-ENV PATH="/usr/local/bin:/opt/venv/bin:$PATH"
+# Set environment to use virtual environment
+ENV PATH="/opt/venv/bin:${PATH}"
 
 # Copy application code
 COPY app/services/fileloader /opt/ml/code/fileloader
@@ -107,8 +134,7 @@ COPY app/services/sagemaker/docker/inference.py /opt/ml/code/
 WORKDIR /opt/ml/code
 
 # Optimize image size: remove apt caches and Python bytecode files
-RUN rm -rf /var/lib/apt/lists/* \
-    && find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + \
+RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
     && find /opt/venv -type f -name "*.pyc" -delete \
     && find /opt/venv -type f -name "*.pyo" -delete
 
@@ -135,9 +161,9 @@ RUN mkdir -p /opt/ml/model
 # Create a wrapper shell script to serve as the entry point for SageMaker
 RUN echo '#!/bin/bash\n\
     if [ "$1" = "serve" ]; then\n\
-    python -m sagemaker_inference.model_server.start_model_server\n\
+    exec python -m sagemaker_inference.model_server.start_model_server\n\
     else\n\
-    eval "$@"\n\
+    exec "$@"\n\
     fi' > /usr/local/bin/serve && chmod +x /usr/local/bin/serve
 
 # Set environment variables for SageMaker
@@ -145,9 +171,6 @@ ENV SAGEMAKER_PROGRAM=inference.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
 ENV SAGEMAKER_HANDLER=inference.model_fn
 
-# Override the NVIDIA entrypoint to use our serve script
-ENV NVIDIA_DISABLE_REQUIRE=true
-
-# Clear inherited entrypoint and use CMD instead
-ENTRYPOINT []
-CMD ["serve", "serve"]
+# Simple entrypoint configuration
+ENTRYPOINT ["/usr/local/bin/serve"]
+CMD ["serve"]
