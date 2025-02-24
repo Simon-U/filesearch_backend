@@ -1,0 +1,31 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "Installing dependencies..."
+  pre_build:
+    commands:
+      - echo "Logging in to our primary ECR repository..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
+      - echo "Logging in to the base image ECR repository in us-east-1..."
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
+      - REPOSITORY_URI=$REPOSITORY_URI
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
+  build:
+    commands:
+      - echo "Listing working directory:"
+      - ls -la .
+      - echo "Listing app/services/sagemaker/docker directory:"
+      - ls -la app/services/sagemaker/docker
+      - echo "Building the Docker image with verbose output..."
+      - docker build --progress=plain -f app/services/sagemaker/docker/Dockerfile -t $REPOSITORY_URI:latest --build-arg GITHUB_TOKEN="$GITHUB_TOKEN" .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo "Pushing the Docker image..."
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo "Build completed on `date`"
+artifacts:
+  files: "**/*"
