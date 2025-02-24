@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies with Python 3.11
-FROM nvidia/cuda:11.7.1-cudnn8-runtime-ubuntu20.04 AS builder
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu20.04 AS builder
 
 # Install system dependencies, PostgreSQL development libraries, and Python 3.11
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,9 +30,9 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
     sed -i "s|__GITHUB_TOKEN__|$GITHUB_TOKEN|g" /tmp/requirements.txt; \
     fi
 
-# ✅ Corrected PyTorch installation: Install CUDA 11.7-compatible version explicitly
+# Install PyTorch with CUDA 12.1 support
 RUN pip install --no-cache-dir \
-    torch==2.1.0+cu117 torchvision==0.16.0+cu117 torchaudio==2.1.0+cu117 --index-url https://download.pytorch.org/whl/cu117 && \
+    torch==2.1.0+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.0+cu121 --index-url https://download.pytorch.org/whl/cu121 && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     pip install --no-cache-dir \
     transformers==4.36.0 \
@@ -40,15 +40,15 @@ RUN pip install --no-cache-dir \
     pandas==2.1.0 \
     office365-rest-python-client==2.4.1 \
     boto3==1.28.0 \
-    psycopg2==2.9.10  # Ensure psycopg2 installs correctly
+    psycopg2==2.9.10
 
 # Stage 2: Final lightweight image
-FROM nvidia/cuda:11.7.1-cudnn8-runtime-ubuntu20.04
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu20.04
 
 # Copy installed Python packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 
-# Copy application code
+# Rest of your Dockerfile remains the same
 COPY app/services/fileloader /opt/ml/code/fileloader
 COPY app/services/sagemaker/docker/inference.py /opt/ml/code/
 
