@@ -21,6 +21,7 @@ RUN python -m pip install --upgrade setuptools wheel
 
 # Accept GitHub token as a build argument
 ARG GITHUB_TOKEN
+
 # Configure Git to use HTTPS instead of SSH
 RUN git config --global url."https://".insteadOf git:// && \
     git config --global url."https://".insteadOf ssh:// && \
@@ -34,18 +35,17 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
     sed -i "s|__GITHUB_TOKEN__|${GITHUB_TOKEN}|g" /tmp/requirements.txt; \
     fi
 
-# Install PyTorch with CUDA 12.1 support first
+# Install base dependencies first
 RUN pip install --no-cache-dir \
     torch==2.5.1+cu121 \
     torchvision==0.20.1+cu121 \
     torchaudio==2.5.1+cu121 \
     --extra-index-url https://download.pytorch.org/whl/cu121
 
-# Install requirements (with retry for robustness)
-RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
-    (sleep 5 && pip install --no-cache-dir -r /tmp/requirements.txt)
+# Install pydantic first to ensure correct version
+RUN pip install --no-cache-dir "pydantic>=2.10.5,<3.0.0"
 
-# Install additional specific packages
+# Install key packages separately
 RUN pip install --no-cache-dir \
     transformers==4.48.1 \
     Pillow==10.4.0 \
@@ -53,6 +53,11 @@ RUN pip install --no-cache-dir \
     office365-rest-python-client==2.4.1 \
     boto3==1.35.63 \
     psycopg2==2.9.10
+
+# Install the rest of requirements with retries
+RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
+    (sleep 5 && pip install --no-cache-dir -r /tmp/requirements.txt) || \
+    (sleep 10 && pip install --no-cache-dir -r /tmp/requirements.txt --no-deps)
 
 # Remove the token from the requirements file for security
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
