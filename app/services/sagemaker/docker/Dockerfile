@@ -1,13 +1,13 @@
 # Stage 1: Build dependencies with Python 3.11
 FROM nvidia/cuda:11.7.1-cudnn8-runtime-ubuntu20.04 AS builder
 
-# Install system dependencies and Python 3.11
+# Install system dependencies, PostgreSQL development libraries, and Python 3.11
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3.11-venv python3.11-dev \
-    git wget curl build-essential \
+    python3.11 python3.11-venv python3.11-dev python3-pip \
+    git wget curl build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Ensure Python 3.11 is the default
@@ -39,7 +39,8 @@ RUN pip install --no-cache-dir \
     Pillow==10.0.0 \
     pandas==2.1.0 \
     office365-rest-python-client==2.4.1 \
-    boto3==1.28.0
+    boto3==1.28.0 \
+    psycopg2==2.9.10  # Ensure psycopg2 installs correctly
 
 # Stage 2: Final lightweight image
 FROM nvidia/cuda:11.7.1-cudnn8-runtime-ubuntu20.04
