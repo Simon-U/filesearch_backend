@@ -6,19 +6,12 @@ phases:
       - echo "Installing dependencies..."
   pre_build:
     commands:
-      # Login to the destination ECR repository in your region (us-west-2)
       - echo "Logging in to our destination ECR repository in $AWS_DEFAULT_REGION..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
-
-      # Login to the AWS DLC ECR repository in us-east-1 to pull base image
       - echo "Logging in to the AWS Deep Learning Containers ECR repository in us-east-1..."
       - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
-
-      # Set variables
       - REPOSITORY_URI=$REPOSITORY_URI
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
-
-      # Print variables for debugging
       - echo "REPOSITORY_URI: $REPOSITORY_URI"
       - echo "IMAGE_TAG: $IMAGE_TAG"
       - echo "AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION"
@@ -27,29 +20,19 @@ phases:
     commands:
       - echo "Listing current directory contents:"
       - ls -la .
-
       - echo "Listing app/services/sagemaker/docker directory:"
       - ls -la app/services/sagemaker/docker || echo "Directory not found"
-
-      # Update the base image reference in Dockerfile if needed
       - echo "Ensuring the Dockerfile references the correct regional image..."
       - sed -i 's|FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com|FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com|g' app/services/sagemaker/docker/Dockerfile
-
-      # Build the Docker image with verbose output
       - echo "Building the Docker image with verbose output..."
       - docker build --progress=plain -f app/services/sagemaker/docker/Dockerfile -t $REPOSITORY_URI:latest --build-arg GITHUB_TOKEN="$GITHUB_TOKEN" .
-
-      # Tag the image with both latest and specific version
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
 
   post_build:
     commands:
-      # Push the Docker image to your repository in us-west-2
       - echo "Pushing the Docker image to $REPOSITORY_URI..."
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-
-      # Output SageMaker image URI for reference
       - echo "SageMaker-compatible image URI: $REPOSITORY_URI:$IMAGE_TAG"
       - echo "Build completed on $(date)"
 
