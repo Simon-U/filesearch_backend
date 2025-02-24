@@ -138,7 +138,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # Copy application code; copy the inference script and serve script (both in the same directory)
 COPY app/services/fileloader /opt/ml/code/fileloader
 COPY app/services/sagemaker/docker/inference.py /opt/ml/code/inference.py
-COPY serve.py /opt/ml/code/serve.py
+COPY app/services/sagemaker/serve.py /opt/ml/code/serve.py
 
 # Set working directory
 WORKDIR /opt/ml/code
