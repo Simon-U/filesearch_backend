@@ -128,7 +128,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 # Copy application code; update to use the training script
 COPY app/services/fileloader /opt/ml/code/fileloader
-COPY app/services/sagemaker/docker/train.py /opt/ml/code/train.py
+COPY app/services/sagemaker/docker/inference.py /opt/ml/code/train.py
 
 # Set working directory
 WORKDIR /opt/ml/code
