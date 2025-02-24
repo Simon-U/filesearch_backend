@@ -1,25 +1,38 @@
 # Stage 1: Build dependencies with Python 3.11
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu20.04 AS builder
 
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install system dependencies, PostgreSQL development libraries, and Python 3.11
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3.11-venv python3.11-dev python3-pip \
-    git wget curl build-essential libpq-dev \
+    python3.11 \
+    python3.11-dev \
+    python3.11-venv \
+    python3.11-distutils \
+    python3-pip \
+    python3-setuptools \
+    git \
+    wget \
+    curl \
+    build-essential \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and activate a virtual environment
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3.11 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# Create directory for virtual environment
+RUN mkdir -p /opt/venv
 
-# Manually install the latest pip version in the virtual environment
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python
+# Create virtual environment
+RUN python3.11 -m venv /opt/venv
 
-# Install setuptools and wheel separately to avoid broken dependencies
-RUN python -m pip install --upgrade setuptools wheel
+# Activate virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip in the virtual environment
+RUN /opt/venv/bin/python -m pip install --upgrade pip setuptools wheel
 
 # Accept GitHub token as a build argument
 ARG GITHUB_TOKEN
@@ -38,17 +51,17 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
     fi
 
 # Install base dependencies first
-RUN pip install --no-cache-dir \
+RUN /opt/venv/bin/pip install --no-cache-dir \
     torch==2.5.1+cu121 \
     torchvision==0.20.1+cu121 \
     torchaudio==2.5.1+cu121 \
     --extra-index-url https://download.pytorch.org/whl/cu121
 
 # Install pydantic first to ensure correct version
-RUN pip install --no-cache-dir "pydantic>=2.10.5,<3.0.0"
+RUN /opt/venv/bin/pip install --no-cache-dir "pydantic>=2.10.5,<3.0.0"
 
 # Install key packages separately
-RUN pip install --no-cache-dir \
+RUN /opt/venv/bin/pip install --no-cache-dir \
     transformers==4.48.1 \
     Pillow==10.4.0 \
     pandas==2.2.3 \
@@ -57,9 +70,9 @@ RUN pip install --no-cache-dir \
     psycopg2==2.9.10
 
 # Install the rest of requirements with retries
-RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
-    (sleep 5 && pip install --no-cache-dir -r /tmp/requirements.txt) || \
-    (sleep 10 && pip install --no-cache-dir -r /tmp/requirements.txt --no-deps)
+RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt || \
+    (sleep 5 && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt) || \
+    (sleep 10 && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt --no-deps)
 
 # Remove the token from the requirements file for security
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
@@ -67,22 +80,24 @@ RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
 # Stage 2: Final lightweight image
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu20.04
 
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install Python 3.11 and required system libraries in the final stage
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3.11-dev \
+    python3.11 \
+    python3.11-venv \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment directory
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3.11 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
+
+# Set environment to use virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application code
 COPY app/services/fileloader /opt/ml/code/fileloader
@@ -93,9 +108,9 @@ WORKDIR /opt/ml/code
 
 # Optimize image size: remove apt caches and Python bytecode files
 RUN rm -rf /var/lib/apt/lists/* \
-    && find $VIRTUAL_ENV -type d -name "__pycache__" -exec rm -rf {} + \
-    && find $VIRTUAL_ENV -type f -name "*.pyc" -delete \
-    && find $VIRTUAL_ENV -type f -name "*.pyo" -delete
+    && find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + \
+    && find /opt/venv -type f -name "*.pyc" -delete \
+    && find /opt/venv -type f -name "*.pyo" -delete
 
 # Ensure the application code is accessible
 RUN chmod -R 755 /opt/ml/code
