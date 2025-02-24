@@ -1,10 +1,24 @@
 # Stage 1: Build dependencies
 FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime AS builder
 
-# Copy the requirements file from the repository root into the builder stage
+# Install git so that pip can clone private repositories
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# Accept SSH private key as a build argument
+ARG SSH_PRIVATE_KEY
+
+# If the SSH key is provided, set up SSH
+RUN if [ -n "$SSH_PRIVATE_KEY" ]; then \
+    mkdir -p /root/.ssh && \
+    echo "$SSH_PRIVATE_KEY" > /root/.ssh/id_rsa && \
+    chmod 600 /root/.ssh/id_rsa && \
+    ssh-keyscan github.com >> /root/.ssh/known_hosts; \
+    fi
+
+# Copy the requirements file from the repository root
 COPY requirements.txt /tmp/requirements.txt
 
-# Install dependencies from the requirements file and additional packages
+# Install dependencies (this will use git+ssh URLs for private repos)
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
     pip install --no-cache-dir \
     transformers==4.36.0 \
@@ -14,10 +28,13 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
     office365-rest-python-client==2.4.1 \
     boto3==1.28.0
 
+# Remove the SSH key so it doesn’t end up in later stages
+RUN rm -f /root/.ssh/id_rsa
+
 # Stage 2: Final lightweight image
 FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 
-# Copy only necessary packages from the builder stage (adjusted for public PyTorch image)
+# Copy installed Python packages from builder
 COPY --from=builder /opt/conda/lib/python3.10/site-packages /opt/conda/lib/python3.10/site-packages
 
 # Copy application code
@@ -27,19 +44,19 @@ COPY app/services/sagemaker/docker/inference.py /opt/ml/code/
 # Set working directory
 WORKDIR /opt/ml/code
 
-# Optimize image size: remove apt caches and Python bytecode files
+# Optimize image size
 RUN rm -rf /var/lib/apt/lists/* \
     && find /opt/conda/lib/python3.10/site-packages -type d -name "__pycache__" -exec rm -rf {} + \
     && find /opt/conda/lib/python3.10/site-packages -type f -name "*.pyc" -delete \
     && find /opt/conda/lib/python3.10/site-packages -type f -name "*.pyo" -delete
 
-# Ensure the application code is accessible
+# Ensure application code is accessible
 RUN chmod -R 755 /opt/ml/code
 
-# Set Python path so modules are found
+# Set Python path
 ENV PYTHONPATH=/opt/ml/code
 
-# Set default environment variables for the analyzer
+# Set default environment variables for analyzer
 ENV MODEL_TYPE=transformer
 ENV MODEL_NAME=openai/clip-vit-base-patch32
 ENV CONFIDENCE_THRESHOLD=0.4
