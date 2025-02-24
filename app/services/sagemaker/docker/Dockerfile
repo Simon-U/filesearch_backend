@@ -30,9 +30,9 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
     sed -i "s|__GITHUB_TOKEN__|$GITHUB_TOKEN|g" /tmp/requirements.txt; \
     fi
 
-# Install PyTorch with CUDA support & other dependencies
+# ✅ Corrected PyTorch installation: Install CUDA 11.7-compatible version explicitly
 RUN pip install --no-cache-dir \
-    torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117 && \
+    torch==2.1.0+cu117 torchvision==0.16.0+cu117 torchaudio==2.1.0+cu117 --index-url https://download.pytorch.org/whl/cu117 && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     pip install --no-cache-dir \
     transformers==4.36.0 \
