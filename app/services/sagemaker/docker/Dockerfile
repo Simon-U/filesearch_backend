@@ -90,8 +90,8 @@ RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt || \
 # Remove the token from the requirements file for security
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
 
-# Install the SageMaker Training Toolkit and the Inference Toolkit in the builder stage
-RUN /opt/venv/bin/pip install --no-cache-dir sagemaker-training sagemaker-inference
+# Install the SageMaker Inference Toolkit and Multi Model Server in the builder stage
+RUN /opt/venv/bin/pip install --no-cache-dir multi-model-server sagemaker-inference
 
 # Stage 2: Final lightweight image using Ubuntu 20.04 and Python 3.10
 FROM ubuntu:20.04
@@ -123,7 +123,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
 ENV PATH="/usr/local/cuda-12.1/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
 
-# Copy virtual environment from builder stage (which already includes sagemaker-training and sagemaker-inference)
+# Copy virtual environment from builder stage (which already includes sagemaker-inference and multi-model-server)
 COPY --from=builder /opt/venv /opt/venv
 
 # Set environment to use virtual environment
