@@ -1,13 +1,13 @@
-# Stage 1: Build a base image with Python 3.11 and CUDA support
+# Stage 1: Build dependencies with Python 3.11
 FROM nvidia/cuda:11.7.1-cudnn8-runtime-ubuntu20.04 AS builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3.11-venv python3.11-dev \
-    git \
-    wget \
-    curl \
-    build-essential \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-venv python3.11-dev python3-pip \
+    git wget curl build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Ensure Python 3.11 is the default
@@ -16,7 +16,7 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 # Upgrade pip, setuptools, and wheel to ensure smooth metadata generation
 RUN python -m pip install --upgrade pip setuptools wheel
 
-# Accept GitHub token as a build argument for private repositories
+# Accept GitHub token as a build argument
 ARG GITHUB_TOKEN
 
 # Copy the requirements file from the repository root
