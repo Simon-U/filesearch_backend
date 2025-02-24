@@ -1,10 +1,10 @@
-# Stage 1: Build dependencies with Ubuntu 20.04 and Python 3.11
+# Stage 1: Build dependencies with Ubuntu 20.04 and Python 3.10
 FROM ubuntu:20.04 AS builder
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies and Python 3.11
+# Install system dependencies and Python 3.10
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     wget \
@@ -16,10 +16,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-dev \
-    python3.11-venv \
-    python3.11-distutils \
+    python3.10 \
+    python3.10-dev \
+    python3.10-venv \
+    python3.10-distutils \
     python3-pip \
     python3-setuptools
 
@@ -38,8 +38,8 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
 # Create directory for virtual environment
 RUN mkdir -p /opt/venv
 
-# Create virtual environment
-RUN python3.11 -m venv /opt/venv
+# Create virtual environment using Python 3.10
+RUN python3.10 -m venv /opt/venv
 
 # Activate virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
@@ -63,7 +63,7 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
     sed -i "s|__GITHUB_TOKEN__|${GITHUB_TOKEN}|g" /tmp/requirements.txt; \
     fi
 
-# Install base dependencies first
+# Install base dependencies first (with appropriate versions)
 RUN /opt/venv/bin/pip install --no-cache-dir \
     torch==2.5.1+cu121 \
     torchvision==0.20.1+cu121 \
@@ -90,13 +90,13 @@ RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt || \
 # Remove the token from the requirements file for security
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
 
-# Stage 2: Final lightweight image
+# Stage 2: Final lightweight image using Ubuntu 20.04 and Python 3.10
 FROM ubuntu:20.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python 3.11 and required system libraries in the final stage
+# Install Python 3.10 and required system libraries in the final stage
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     wget \
@@ -105,8 +105,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-venv
+    python3.10 \
+    python3.10-venv
 
 # Install CUDA runtime only (not full toolkit)
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb \
@@ -126,9 +126,9 @@ COPY --from=builder /opt/venv /opt/venv
 # Set environment to use virtual environment
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Copy application code
+# Copy application code; update to use the training script
 COPY app/services/fileloader /opt/ml/code/fileloader
-COPY app/services/sagemaker/docker/inference.py /opt/ml/code/
+COPY app/services/sagemaker/docker/train.py /opt/ml/code/train.py
 
 # Set working directory
 WORKDIR /opt/ml/code
@@ -144,7 +144,7 @@ RUN chmod -R 755 /opt/ml/code
 # Set Python path so modules are found
 ENV PYTHONPATH=/opt/ml/code
 
-# Set default environment variables for analyzer
+# Set any default environment variables for your training script if needed
 ENV MODEL_TYPE=transformer
 ENV MODEL_NAME=openai/clip-vit-base-patch32
 ENV CONFIDENCE_THRESHOLD=0.4
@@ -152,26 +152,15 @@ ENV USE_HALF_PRECISION=true
 ENV ENABLE_CAPTIONING=true
 ENV CAPTION_MODEL=Salesforce/blip-image-captioning-base
 
-# Update SageMaker toolkit installation:
-# *** Key Change: Install sagemaker-inference (not sagemaker-inference-toolkit) ***
-RUN /opt/venv/bin/pip install --no-cache-dir sagemaker-training sagemaker-inference
+# Install the SageMaker Training Toolkit
+RUN /opt/venv/bin/pip install --no-cache-dir sagemaker-training
 
 # Create directory structure expected by SageMaker
 RUN mkdir -p /opt/ml/model
 
-# Create a wrapper shell script to serve as the entry point for SageMaker
-RUN echo '#!/bin/bash\n\
-    if [ "$1" = "serve" ]; then\n\
-    exec python -m sagemaker_inference.model_server.start_model_server\n\
-    else\n\
-    exec "$@"\n\
-    fi' > /usr/local/bin/serve && chmod +x /usr/local/bin/serve
-
-# Set environment variables for SageMaker
-ENV SAGEMAKER_PROGRAM=inference.py
+# Set environment variables for SageMaker training
+ENV SAGEMAKER_PROGRAM=train.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
-ENV SAGEMAKER_HANDLER=inference.model_fn
 
-# Simple entrypoint configuration
-ENTRYPOINT ["/usr/local/bin/serve"]
-CMD ["serve"]
+# Use the training script as the container's entry point
+CMD ["python", "/opt/ml/code/train.py"]
