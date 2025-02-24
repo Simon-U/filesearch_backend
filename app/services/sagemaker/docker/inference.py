@@ -1,9 +1,9 @@
 import os
 import json
 import torch
-from fileloader.loader import FileLoader
-from fileloader.models import SharePointConfig
-from fileloader.image_processor.analyzer import AnalyzerConfig
+from app.services.fileloader.loader import FileLoader
+from app.services.fileloader.models import SharePointConfig
+from app.services.fileloader.image_processor.analyzer import AnalyzerConfig
 
 def get_analyzer_config():
     """Get analyzer configuration from environment variables or defaults"""
