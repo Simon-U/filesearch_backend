@@ -111,6 +111,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 \
     python3.10-venv
 
+# Install Java runtime (OpenJDK 11) for MMS
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-11-jre-headless
+
+# Set JAVA_HOME environment variable
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
 # Install CUDA runtime only (not full toolkit)
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb \
     && dpkg -i cuda-keyring_1.0-1_all.deb \
@@ -132,7 +138,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # Copy application code; copy the inference script and serve script (both in the same directory)
 COPY app/services/fileloader /opt/ml/code/fileloader
 COPY app/services/sagemaker/docker/inference.py /opt/ml/code/inference.py
-COPY app/services/sagemaker/docker/serve.py /opt/ml/code/serve.py
+COPY serve.py /opt/ml/code/serve.py
 
 # Set working directory
 WORKDIR /opt/ml/code
