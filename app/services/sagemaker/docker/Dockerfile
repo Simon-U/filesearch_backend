@@ -10,10 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git wget curl build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure Python 3.11 is the default
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+# Create and activate a virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3.11 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Manually install the latest pip version
+# Manually install the latest pip version in the virtual environment
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python
 
 # Install setuptools and wheel separately to avoid broken dependencies
@@ -74,9 +76,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed Python packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Create virtual environment directory
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3.11 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Copy virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
 
 # Copy application code
 COPY app/services/fileloader /opt/ml/code/fileloader
@@ -87,9 +93,9 @@ WORKDIR /opt/ml/code
 
 # Optimize image size: remove apt caches and Python bytecode files
 RUN rm -rf /var/lib/apt/lists/* \
-    && find /usr/local/lib/python3.11/site-packages -type d -name "__pycache__" -exec rm -rf {} + \
-    && find /usr/local/lib/python3.11/site-packages -type f -name "*.pyc" -delete \
-    && find /usr/local/lib/python3.11/site-packages -type f -name "*.pyo" -delete
+    && find $VIRTUAL_ENV -type d -name "__pycache__" -exec rm -rf {} + \
+    && find $VIRTUAL_ENV -type f -name "*.pyc" -delete \
+    && find $VIRTUAL_ENV -type f -name "*.pyo" -delete
 
 # Ensure the application code is accessible
 RUN chmod -R 755 /opt/ml/code
