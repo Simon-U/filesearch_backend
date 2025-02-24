@@ -90,8 +90,8 @@ RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt || \
 # Remove the token from the requirements file for security
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
 
-# **Install the SageMaker Training Toolkit in the builder stage**
-RUN /opt/venv/bin/pip install --no-cache-dir sagemaker-training
+# Install the SageMaker Training Toolkit and the Inference Toolkit in the builder stage
+RUN /opt/venv/bin/pip install --no-cache-dir sagemaker-training sagemaker-inference
 
 # Stage 2: Final lightweight image using Ubuntu 20.04 and Python 3.10
 FROM ubuntu:20.04
@@ -123,15 +123,15 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
 ENV PATH="/usr/local/cuda-12.1/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
 
-# Copy virtual environment from builder stage (which already includes sagemaker-training)
+# Copy virtual environment from builder stage (which already includes sagemaker-training and sagemaker-inference)
 COPY --from=builder /opt/venv /opt/venv
 
 # Set environment to use virtual environment
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Copy application code; update to use the training script
+# Copy application code; copy the inference script (not renaming it)
 COPY app/services/fileloader /opt/ml/code/fileloader
-COPY app/services/sagemaker/docker/inference.py /opt/ml/code/train.py
+COPY app/services/sagemaker/docker/inference.py /opt/ml/code/inference.py
 
 # Set working directory
 WORKDIR /opt/ml/code
@@ -147,7 +147,7 @@ RUN chmod -R 755 /opt/ml/code
 # Set Python path so modules are found
 ENV PYTHONPATH=/opt/ml/code
 
-# Set any default environment variables for your training script if needed
+# Set any default environment variables for your inference script if needed
 ENV MODEL_TYPE=transformer
 ENV MODEL_NAME=openai/clip-vit-base-patch32
 ENV CONFIDENCE_THRESHOLD=0.4
@@ -158,9 +158,18 @@ ENV CAPTION_MODEL=Salesforce/blip-image-captioning-base
 # Create directory structure expected by SageMaker
 RUN mkdir -p /opt/ml/model
 
-# Set environment variables for SageMaker training
-ENV SAGEMAKER_PROGRAM=train.py
+# Set environment variables for SageMaker inference
+ENV SAGEMAKER_PROGRAM=inference.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
 
-# Use the training script as the container's entry point
-CMD ["python", "/opt/ml/code/train.py"]
+# Create an entrypoint script that starts the model server when invoked with "serve"
+RUN echo '#!/bin/bash\n\
+    if [ "$1" = "serve" ]; then\n\
+    exec python -m sagemaker_inference.model_server.start_model_server\n\
+    else\n\
+    exec "$@"\n\
+    fi' > /usr/local/bin/serve && chmod +x /usr/local/bin/serve
+
+# Set ENTRYPOINT to the serve script and default CMD to "serve"
+ENTRYPOINT ["/usr/local/bin/serve"]
+CMD ["serve"]
