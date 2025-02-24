@@ -6,6 +6,8 @@ phases:
       - echo "Installing dependencies..."
   pre_build:
     commands:
+      - echo "Logging in to Docker Hub..."
+      - docker login -u $DOCKER_HUB_USERNAME -p $DOCKER_HUB_PASSWORD
       - echo "Logging in to our primary ECR repository..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
       - echo "Logging in to the base image ECR repository in us-east-1..."
