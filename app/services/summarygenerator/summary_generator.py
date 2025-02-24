@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 import os
 import random
 from typing import List
-from agent_toolbox.base.agent_library.base import BaseAgent
+from agent_toolbox.base_agents.base import BaseAgent
 # Load .env file
 load_dotenv()
 

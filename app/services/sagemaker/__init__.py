@@ -1,202 +1,119 @@
-import boto3
-import sagemaker
-from sagemaker.transformer import Transformer
-from sagemaker.model import Model
-import time
-from typing import List, Dict, Tuple, Optional
-import json
 import os
-from contextlib import contextmanager
+import json
+import torch
+from fileloader.loader import FileLoader
+from fileloader.models import SharePointConfig, FileLocation, StorageType
+from fileloader.image_processor.analyzer import AnalyzerConfig
 
-class SageMakerController:
-    """Controls SageMaker infrastructure lifecycle"""
+def get_analyzer_config():
+    """Get analyzer configuration from environment variables or defaults"""
+    return AnalyzerConfig(
+        hf_token=os.getenv('HF_TOKEN'),
+        model_type=os.getenv('MODEL_TYPE', "transformer"),
+        model_name=os.getenv('MODEL_NAME', "openai/clip-vit-base-patch32"),
+        confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', "0.4")),
+        device="cuda" if torch.cuda.is_available() else "cpu",
+        use_half_precision=os.getenv('USE_HALF_PRECISION', 'true').lower() == 'true',
+        optimize_memory_usage=True,
+        enable_captioning=os.getenv('ENABLE_CAPTIONING', 'true').lower() == 'true',
+        caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base')
+    )
+
+def model_fn(model_dir):
+    """
+    Initialize the FileLoader with configurations.
+    This is called by SageMaker when starting the model server.
+    """
+    # Get SharePoint configuration from environment variables
+    sharepoint_config = SharePointConfig(
+        tenant_id=os.environ.get('SHAREPOINT_TENANT_ID'),
+        client_id=os.environ.get('SHAREPOINT_CLIENT_ID'),
+        client_secret=os.environ.get('SHAREPOINT_CLIENT_SECRET'),
+        site_url=os.environ.get('SHAREPOINT_SITE_URL')
+    )
     
-    def __init__(
-        self,
-        role_arn: str,
-        model_name: str = 'fileloader-model',
-        instance_type: str = 'ml.m5.xlarge',
-        instance_count: int = 1
-    ):
-        self.sagemaker_session = sagemaker.Session()
-        self.role = role_arn
-        self.model_name = model_name
-        self.instance_type = instance_type
-        self.instance_count = instance_count
-        
-        # Initialize clients
-        self.sagemaker_client = boto3.client('sagemaker')
-        self.s3 = boto3.client('s3')
-        
-        # Track resources for cleanup
-        self.resources_to_cleanup = []
-        
-    def _create_model(self, image_uri: str, model_data_url: str) -> None:
-        """Create SageMaker model"""
-        model = Model(
-            image_uri=image_uri,
-            model_data=model_data_url,
-            role=self.role,
-            name=self.model_name,
-            sagemaker_session=self.sagemaker_session
-        )
-        model.create(
-            instance_type=self.instance_type,
-            environment={
-                'SHAREPOINT_TENANT_ID': os.getenv('SHAREPOINT_TENANT_ID'),
-                'SHAREPOINT_CLIENT_ID': os.getenv('SHAREPOINT_CLIENT_ID'),
-                'SHAREPOINT_CLIENT_SECRET': os.getenv('SHAREPOINT_CLIENT_SECRET'),
-                'SHAREPOINT_SITE_URL': os.getenv('SHAREPOINT_SITE_URL')
-            }
-        )
-        self.resources_to_cleanup.append(('model', self.model_name))
+    # Get analyzer configuration
+    analyzer_config = get_analyzer_config()
+    
+    # Initialize FileLoader with configurations
+    loader = FileLoader(
+        config=sharepoint_config,
+        num_threads=int(os.getenv('NUM_THREADS', '8')),
+        use_cuda=torch.cuda.is_available(),
+        do_table_structure=True,
+        do_ocr=True,
+        do_image_enrichment=True,
+        image_analyzer_config=analyzer_config
+    )
+    
+    return loader
 
-    def _create_transform_job(
-        self,
-        input_location: str,
-        output_location: str
-    ) -> str:
-        """Create and start batch transform job"""
-        job_name = f"{self.model_name}-{int(time.time())}"
+def input_fn(request_body, request_content_type):
+    """
+    Parse input data coming from SageMaker invocations.
+    Expects JSON with file_location.
+    """
+    if request_content_type != 'application/json':
+        raise ValueError(f'Unsupported content type: {request_content_type}')
+    
+    # Parse the incoming JSON request
+    input_data = json.loads(request_body)
+    
+    # Validate input
+    if 'file_location' not in input_data:
+        raise ValueError("Input must contain 'file_location'")
+    
+    # Convert dictionary to FileLocation object if needed
+    file_location_data = input_data['file_location']
+    if isinstance(file_location_data, dict):
+        # Convert string storage_type to Enum
+        storage_type_str = file_location_data.get('storage_type', 'local')
+        storage_type = StorageType(storage_type_str)
         
-        transformer = Transformer(
-            model_name=self.model_name,
-            instance_count=self.instance_count,
-            instance_type=self.instance_type,
-            output_path=output_location,
-            sagemaker_session=self.sagemaker_session
+        file_location = FileLocation(
+            path=file_location_data['path'],
+            storage_type=storage_type,
+            version=file_location_data.get('version')
         )
-        
-        transformer.transform(
-            data=input_location,
-            content_type='application/json',
-            split_type='Line'
-        )
-        
-        self.resources_to_cleanup.append(('transform-job', job_name))
-        return job_name
+        return file_location
+    
+    return input_data['file_location']
 
-    def _wait_for_transform_job(self, job_name: str, timeout: int = 3600) -> bool:
-        """Wait for batch transform job completion"""
-        start_time = time.time()
+def predict_fn(file_location, model):
+    """
+    Process file using FileLoader.
+    Args:
+        file_location: FileLocation object or path
+        model: Initialized FileLoader instance
+    """
+    try:
+        # Process the file
+        document, metadata = model.load(file_location)
         
-        while time.time() - start_time < timeout:
-            response = self.sagemaker_client.describe_transform_job(
-                TransformJobName=job_name
-            )
-            status = response['TransformJobStatus']
-            
-            if status == 'Completed':
-                return True
-            elif status in ['Failed', 'Stopped']:
-                raise Exception(f"Job failed with status {status}")
-                
-            time.sleep(30)
-            
-        raise TimeoutError("Transform job timed out")
+        # Prepare successful response
+        return {
+            'status': 'success',
+            'document': document,
+            'metadata': metadata,
+            'error': None
+        }
+    except Exception as e:
+        # Handle any errors during processing
+        return {
+            'status': 'error',
+            'document': None,
+            'metadata': None,
+            'error': str(e)
+        }
 
-    def _cleanup_resources(self) -> None:
-        """Clean up all created resources"""
-        for resource_type, resource_name in self.resources_to_cleanup:
-            try:
-                if resource_type == 'model':
-                    self.sagemaker_client.delete_model(ModelName=resource_name)
-                elif resource_type == 'transform-job':
-                    try:
-                        self.sagemaker_client.stop_transform_job(
-                            TransformJobName=resource_name
-                        )
-                    except:
-                        pass  # Job might be already completed
-            except Exception as e:
-                print(f"Error cleaning up {resource_type} {resource_name}: {str(e)}")
-
-    @contextmanager
-    def process_files(
-        self,
-        file_paths: List[str],
-        image_uri: str,
-        model_data_url: str,
-        timeout: int = 3600
-    ) -> Tuple[List[str], List[Dict]]:
-        """
-        Process files using SageMaker with automatic cleanup
-        
-        Args:
-            file_paths: List of file paths to process
-            image_uri: URI of the Docker image containing FileLoader
-            model_data_url: S3 URL of model artifacts
-            timeout: Maximum time to wait for completion
-            
-        Returns:
-            Tuple of (document_contents, metadata_list)
-        """
-        try:
-            # Create model
-            self._create_model(image_uri, model_data_url)
-            
-            # Prepare input data
-            input_location = self._prepare_input(file_paths)
-            output_location = f"s3://{self.sagemaker_session.default_bucket()}/output/"
-            
-            # Start transform job
-            job_name = self._create_transform_job(input_location, output_location)
-            
-            # Wait for completion
-            self._wait_for_transform_job(job_name, timeout)
-            
-            # Get results
-            results = self._get_results(output_location, job_name)
-            
-            yield results
-            
-        finally:
-            # Cleanup all resources
-            self._cleanup_resources()
-            
-    def _prepare_input(self, file_paths: List[str]) -> str:
-        """Prepare input data in S3"""
-        bucket = self.sagemaker_session.default_bucket()
-        key = f"input/batch_{int(time.time())}.jsonl"
-        
-        # Create JSONL file with file paths
-        content = '\n'.join(json.dumps({'file_path': path}) for path in file_paths)
-        
-        # Upload to S3
-        self.s3.put_object(
-            Bucket=bucket,
-            Key=key,
-            Body=content.encode('utf-8')
-        )
-        
-        return f"s3://{bucket}/{key}"
-        
-    def _get_results(
-        self,
-        output_location: str,
-        job_name: str
-    ) -> Tuple[List[str], List[Dict]]:
-        """Get and parse job results"""
-        # Download results from S3
-        bucket, prefix = self._parse_s3_url(output_location)
-        response = self.s3.get_object(
-            Bucket=bucket,
-            Key=f"{prefix}/{job_name}.out"
-        )
-        
-        # Parse results
-        results = response['Body'].read().decode('utf-8').splitlines()
-        documents = []
-        metadata = []
-        
-        for result in results:
-            parsed = json.loads(result)
-            documents.append(parsed['document'])
-            metadata.append(parsed['metadata'])
-            
-        return documents, metadata
-        
-    def _parse_s3_url(self, url: str) -> Tuple[str, str]:
-        """Parse S3 URL into bucket and prefix"""
-        parts = url.replace('s3://', '').split('/')
-        return parts[0], '/'.join(parts[1:])
+def output_fn(prediction_output, accept):
+    """
+    Format the output to return to SageMaker client.
+    Args:
+        prediction_output: Dictionary containing results
+        accept: Accept header from the client
+    """
+    if accept == 'application/json':
+        return json.dumps(prediction_output), 'application/json'
+    
+    raise ValueError(f'Unsupported accept header: {accept}')

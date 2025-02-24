@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from agent_toolbox.base.agent_library.base import BaseAgent
+from agent_toolbox.base_agents.base import BaseAgent
 from typing import List
 import os
 from pydantic import BaseModel, Field

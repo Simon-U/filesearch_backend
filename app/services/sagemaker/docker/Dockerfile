@@ -126,5 +126,24 @@ ENV USE_HALF_PRECISION=true
 ENV ENABLE_CAPTIONING=true
 ENV CAPTION_MODEL=Salesforce/blip-image-captioning-base
 
-# Default command to run your inference script
-CMD ["python", "inference.py"]
+# Install SageMaker serving toolkit
+RUN /opt/venv/bin/pip install --no-cache-dir sagemaker-inference flask
+
+# Create directory structure expected by SageMaker
+RUN mkdir -p /opt/ml/model
+
+# Create a wrapper shell script to serve as the entry point for SageMaker
+RUN echo '#!/bin/bash\n\
+    if [ "$1" = "serve" ]; then\n\
+    python -m sagemaker_inference.model_server.start_model_server\n\
+    else\n\
+    eval "$@"\n\
+    fi' > /usr/local/bin/serve && chmod +x /usr/local/bin/serve
+
+# Set environment variables for SageMaker
+ENV SAGEMAKER_PROGRAM=inference.py
+ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
+ENV SAGEMAKER_HANDLER=inference.py
+
+# Set the entry point to the serve script
+ENTRYPOINT ["serve"]
