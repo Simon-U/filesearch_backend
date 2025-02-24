@@ -129,9 +129,10 @@ COPY --from=builder /opt/venv /opt/venv
 # Set environment to use virtual environment
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Copy application code; copy the inference script (not renaming it)
+# Copy application code; copy the inference script and serve script (both in the same directory)
 COPY app/services/fileloader /opt/ml/code/fileloader
 COPY app/services/sagemaker/docker/inference.py /opt/ml/code/inference.py
+COPY app/services/sagemaker/docker/serve.py /opt/ml/code/serve.py
 
 # Set working directory
 WORKDIR /opt/ml/code
@@ -162,10 +163,10 @@ RUN mkdir -p /opt/ml/model
 ENV SAGEMAKER_PROGRAM=inference.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
 
-# Create an entrypoint script that starts the model server when invoked with "serve"
+# Create an entrypoint script that starts the model server using serve.py when invoked with "serve"
 RUN echo '#!/bin/bash\n\
     if [ "$1" = "serve" ]; then\n\
-    exec python -m sagemaker_inference.model_server.start_model_server\n\
+    exec python serve.py\n\
     else\n\
     exec "$@"\n\
     fi' > /usr/local/bin/serve && chmod +x /usr/local/bin/serve
