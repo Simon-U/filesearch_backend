@@ -1,8 +1,12 @@
 # Stage 1: Build dependencies
 FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime AS builder
 
-# Install only necessary dependencies
-RUN pip install --no-cache-dir \
+# Copy the requirements file from the repository root into the builder stage
+COPY requirements.txt /tmp/requirements.txt
+
+# Install dependencies from the requirements file and additional packages
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
+    pip install --no-cache-dir \
     transformers==4.36.0 \
     torch==2.0.1 \
     Pillow==10.0.0 \
@@ -13,7 +17,7 @@ RUN pip install --no-cache-dir \
 # Stage 2: Final lightweight image
 FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 
-# Copy only necessary packages from the builder stage (adjusted path)
+# Copy only necessary packages from the builder stage (adjusted for public PyTorch image)
 COPY --from=builder /opt/conda/lib/python3.10/site-packages /opt/conda/lib/python3.10/site-packages
 
 # Copy application code
@@ -23,19 +27,19 @@ COPY app/services/sagemaker/docker/inference.py /opt/ml/code/
 # Set working directory
 WORKDIR /opt/ml/code
 
-# Optimize image size
+# Optimize image size: remove apt caches and Python bytecode files
 RUN rm -rf /var/lib/apt/lists/* \
     && find /opt/conda/lib/python3.10/site-packages -type d -name "__pycache__" -exec rm -rf {} + \
     && find /opt/conda/lib/python3.10/site-packages -type f -name "*.pyc" -delete \
     && find /opt/conda/lib/python3.10/site-packages -type f -name "*.pyo" -delete
 
-# Make sure files are accessible
+# Ensure the application code is accessible
 RUN chmod -R 755 /opt/ml/code
 
-# Set Python path
+# Set Python path so modules are found
 ENV PYTHONPATH=/opt/ml/code
 
-# Set default environment variables for analyzer
+# Set default environment variables for the analyzer
 ENV MODEL_TYPE=transformer
 ENV MODEL_NAME=openai/clip-vit-base-patch32
 ENV CONFIDENCE_THRESHOLD=0.4
