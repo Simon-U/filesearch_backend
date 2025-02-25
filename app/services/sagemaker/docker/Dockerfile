@@ -4,7 +4,7 @@ FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# Install system dependencies including libssl-dev for OpenSSL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     libpq-dev \
     build-essential \
+    libssl-dev \
     openjdk-11-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
@@ -38,6 +39,12 @@ COPY requirements.txt /tmp/requirements.txt
 RUN if [ -n "$GITHUB_TOKEN" ]; then \
     sed -i "s|__GITHUB_TOKEN__|${GITHUB_TOKEN}|g" /tmp/requirements.txt; \
     fi
+
+# Fix OpenSSL compatibility issues by installing specific versions
+RUN pip install --no-cache-dir \
+    pyOpenSSL==22.0.0 \
+    cryptography==38.0.4 \
+    urllib3==1.26.18
 
 # Install pydantic first to ensure correct version
 RUN pip install --no-cache-dir "pydantic>=2.10.5,<3.0.0"
