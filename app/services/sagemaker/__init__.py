@@ -18,7 +18,7 @@ class SageMakerFileLoader:
         role_arn: str,
         model_name: str = 'fileloader-model',
         endpoint_name: Optional[str] = None,
-        instance_type: str = 'ml.m5.xlarge',
+        instance_type: str = 'ml.g4dn.2xlarge',
         instance_count: int = 1,
         sagemaker_session = None,
         s3_bucket: str = 'fileloader',
