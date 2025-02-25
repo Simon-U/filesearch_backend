@@ -125,9 +125,6 @@ class HandlerService(DefaultHandlerService):
         logger.info(data)
         logger.info(context)
         return self._service.transform(data, context)
-
-# Export handler service for MMS
-handler_service = HandlerService()
         
         
 default_handler = HandlerService()
