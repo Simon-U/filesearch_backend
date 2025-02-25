@@ -42,9 +42,11 @@ RUN if [ -n "$GITHUB_TOKEN" ]; then \
 
 # Fix OpenSSL compatibility issues by installing specific versions
 RUN pip install --no-cache-dir \
-    pyOpenSSL==22.0.0 \
-    cryptography==38.0.4 \
-    urllib3==1.26.18
+    pyOpenSSL==19.1.0 \
+    cryptography==36.0.0 \
+    urllib3==1.26.12 \
+    boto3==1.24.59 \
+    botocore==1.27.59
 
 # Install pydantic first to ensure correct version
 RUN pip install --no-cache-dir "pydantic>=2.10.5,<3.0.0"
@@ -55,13 +57,15 @@ RUN pip install --no-cache-dir \
     Pillow==10.4.0 \
     pandas==2.2.3 \
     office365-rest-python-client==2.4.1 \
-    boto3==1.35.63 \
     psycopg2==2.9.10
 
 # Install the rest of requirements with retries
-RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
-    (sleep 5 && pip install --no-cache-dir -r /tmp/requirements.txt) || \
-    (sleep 10 && pip install --no-cache-dir -r /tmp/requirements.txt --no-deps)
+RUN pip install --no-cache-dir --no-deps -r /tmp/requirements.txt || \
+    (sleep 5 && pip install --no-cache-dir --no-deps -r /tmp/requirements.txt) || \
+    (sleep 10 && pip install --no-cache-dir --no-deps -r /tmp/requirements.txt)
+
+# Now install dependencies of the requirements, but don't allow upgrading critical packages
+RUN pip install --no-cache-dir --upgrade-strategy only-if-needed -r /tmp/requirements.txt
 
 # Remove the token from the requirements file for security
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
