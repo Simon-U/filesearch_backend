@@ -108,7 +108,7 @@ class MyHandler(default_inference_handler.DefaultInferenceHandler):
                 'error': str(e)
             }
 
-    def output_fn(prediction_output, accept):
+    def output_fn(self, prediction_output, accept):
         """
         Format the output to return to SageMaker client.
         Args:
