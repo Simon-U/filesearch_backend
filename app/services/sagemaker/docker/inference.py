@@ -1,10 +1,20 @@
 import os
 import json
 import torch
+import logging
 from fileloader.loader import FileLoader
 from fileloader.models import SharePointConfig, FileLocation, StorageType
 from fileloader.image_processor.analyzer import AnalyzerConfig
 from sagemaker_inference import default_inference_handler
+
+# Set up basic logging to stdout
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 class MyHandler(default_inference_handler.DefaultInferenceHandler):
     def get_analyzer_config(self):
@@ -121,12 +131,22 @@ class MyHandler(default_inference_handler.DefaultInferenceHandler):
         raise ValueError(f'Unsupported accept header: {accept}')
     
     def __call__(self, request, context):
-        # Here you can define how to process the request.
-        print(context)
-        print(request)
-        content_type = getattr(context, 'content_type', 'application/json')
+        # Log the incoming request and context details
+        logger.info("Received request: %s", request)
+        logger.info("Received context: %s", context)
+        try:
+            # Attempt to extract the content type; if not available, default to 'application/json'
+            content_type = getattr(context, 'content_type', 'application/json')
+        except Exception as e:
+            logger.error("Error extracting content type: %s", e)
+            content_type = 'application/json'
+        logger.info("Using content type: %s", content_type)
+        # Process input, prediction, and output
         input_data = self.input_fn(request, content_type)
+        # Ensure that the model is loaded. This example assumes you have already set self.model.
         prediction = self.predict_fn(input_data, self.model)
-        return self.output_fn(prediction, 'application/json')
-    
+        output = self.output_fn(prediction, content_type)
+        logger.info("Returning output: %s", output)
+        return output
+
 default_handler = MyHandler()
