@@ -125,6 +125,6 @@ class MyHandler(default_inference_handler.DefaultInferenceHandler):
         # A simple example might be to use the input_fn, predict_fn, and output_fn:
         input_data = self.input_fn(request, context.get('Content-Type', 'application/json'))
         prediction = self.predict_fn(input_data, self.model)
-        return self.output_fn(prediction, 'application/j
+        return self.output_fn(prediction, 'application/json')
     
 default_handler = MyHandler()
