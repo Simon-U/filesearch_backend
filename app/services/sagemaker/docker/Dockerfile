@@ -35,9 +35,9 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
     cuda-compiler-12-1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set CUDA environment variables
+# Set CUDA environment variables - initialize LD_LIBRARY_PATH to avoid "undefined variable" warnings
 ENV PATH="/usr/local/cuda-12.1/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64"
 # Set CUDA architecture list for PyTorch extensions
 ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
 # Set correct compiler for PyTorch
@@ -90,10 +90,6 @@ RUN /opt/venv/bin/pip install --no-cache-dir \
     boto3==1.35.63 \
     psycopg2==2.9.10
 
-# Pre-build custom CUDA kernels for transformers
-RUN cd /opt/venv/lib/python3.10/site-packages/transformers/kernels/deformable_detr && \
-    FORCE_CUDA=1 /opt/venv/bin/python -m torch.utils.cpp_extension build
-
 # Install the rest of requirements with retries
 RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt || \
     (sleep 5 && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt) || \
@@ -140,9 +136,9 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
     cuda-compiler-12-1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set CUDA environment variables
+# Set CUDA environment variables - initialize LD_LIBRARY_PATH to avoid "undefined variable" warnings
 ENV PATH="/usr/local/cuda-12.1/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64"
 # Set CUDA architecture list for PyTorch extensions
 ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
 # Set correct compiler for PyTorch
@@ -150,8 +146,6 @@ ENV CXX=g++
 
 # Copy virtual environment from builder stage (which already includes sagemaker-inference and multi-model-server)
 COPY --from=builder /opt/venv /opt/venv
-# Copy pre-built CUDA kernels
-COPY --from=builder /root/.cache/torch_extensions /root/.cache/torch_extensions
 
 # Set environment to use virtual environment
 ENV PATH="/opt/venv/bin:${PATH}"
