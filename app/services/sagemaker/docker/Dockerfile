@@ -1,5 +1,5 @@
 # Using official PyTorch image as base with CUDA support
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set JAVA_HOME environment variable for MMS
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
-# Set CUDA environment variables
-ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
+# Set CUDA environment variables for A10G GPUs in G5 instances
+ENV TORCH_CUDA_ARCH_LIST="8.0;8.6+PTX"
 ENV FORCE_CUDA=1
 
 # Accept GitHub token as a build argument
@@ -59,16 +59,18 @@ RUN pip install --no-cache-dir \
     office365-rest-python-client==2.4.1 \
     psycopg2==2.9.10
 
+
 # Install the rest of requirements with retries
-RUN pip install --no-cache-dir --no-deps -r /tmp/requirements.txt || \
-    (sleep 5 && pip install --no-cache-dir --no-deps -r /tmp/requirements.txt) || \
-    (sleep 10 && pip install --no-cache-dir --no-deps -r /tmp/requirements.txt)
+RUN pip install --no-cache-dir --no-deps -r /tmp/filtered_requirements.txt || \
+    (sleep 5 && pip install --no-cache-dir --no-deps -r /tmp/filtered_requirements.txt) || \
+    (sleep 10 && pip install --no-cache-dir --no-deps -r /tmp/filtered_requirements.txt)
 
 # Now install dependencies of the requirements, but don't allow upgrading critical packages
-RUN pip install --no-cache-dir --upgrade-strategy only-if-needed -r /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade-strategy only-if-needed -r /tmp/filtered_requirements.txt
 
 # Remove the token from the requirements file for security
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
+RUN rm -f /tmp/filtered_requirements.txt
 
 # Install the SageMaker Inference Toolkit and Multi Model Server
 RUN pip install --no-cache-dir multi-model-server sagemaker-inference
@@ -109,6 +111,19 @@ ENV CAPTION_MODEL=Salesforce/blip-image-captioning-base
 # Set environment variables for SageMaker inference
 ENV SAGEMAKER_PROGRAM=inference.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
+
+# Add a diagnostic script to verify CUDA setup
+RUN echo '#!/bin/bash\n\
+    echo "NVIDIA Driver:"\n\
+    nvidia-smi\n\
+    echo ""\n\
+    echo "PyTorch CUDA Information:"\n\
+    python -c "import torch; print(f\"PyTorch version: {torch.__version__}\"); \
+    print(f\"CUDA available: {torch.cuda.is_available()}\"); \
+    print(f\"CUDA version: {torch.version.cuda if torch.cuda.is_available() else \"N/A\"}\"); \
+    print(f\"GPU Count: {torch.cuda.device_count()}\"); \
+    print(f\"GPU Name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}\")"\n\
+    ' > /usr/local/bin/check_cuda && chmod +x /usr/local/bin/check_cuda
 
 # Create an entrypoint script that starts the model server using serve.py when invoked with "serve"
 RUN echo '#!/bin/bash\n\
