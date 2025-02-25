@@ -201,18 +201,19 @@ class FileLoader:
             raise UnsupportedFileTypeError(f"File type '{file_extension}' is not supported")
 
         connector = self.connectors[location.storage_type]
-
+        print('QUery file', flush=True)
         content = connector.get_file_content(location)
         metadata = connector.get_metadata(location)
         # Convert bytes to BytesIO before creating DocumentStream
         content_stream = BytesIO(content)
-        
+        print('Start convertung', flush=True)
         document = self._convert_file(
             DocumentStream(name=location.path, stream=content_stream),
             file_extension
         )
 
+        print('Start enrichment', flush=True)
         # Apply image enrichment if enabled
         enriched_document = self._enrich_document(document)
-        
+        print("Finished", flush=True)
         return enriched_document, metadata
