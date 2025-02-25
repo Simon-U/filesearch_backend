@@ -111,13 +111,23 @@ class MyHandler(default_inference_handler.DefaultInferenceHandler):
 
 
 
-
-
 class HandlerService(DefaultHandlerService):
     def __init__(self):
-        # Wrap your custom handler with the Transformer.
         transformer = Transformer(default_inference_handler=MyHandler())
         super(HandlerService, self).__init__(transformer=transformer)
+
+    def handle(self, data, context):
+        """
+        MMS calls this function for inference.
+        `data`: The request data.
+        `context`: Metadata about the request.
+        """
+        logger.info(data)
+        logger.info(context)
+        return self._service.transform(data, context)
+
+# Export handler service for MMS
+handler_service = HandlerService()
         
         
 default_handler = HandlerService()
