@@ -7,7 +7,7 @@ from fileloader.image_processor.analyzer import AnalyzerConfig
 from sagemaker_inference import default_inference_handler
 
 class MyHandler(default_inference_handler.DefaultInferenceHandler):
-    def get_analyzer_config():
+    def get_analyzer_config(self):
         """Get analyzer configuration from environment variables or defaults"""
         return AnalyzerConfig(
             hf_token=os.getenv('HF_TOKEN'),
@@ -21,7 +21,7 @@ class MyHandler(default_inference_handler.DefaultInferenceHandler):
             caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base')
         )
 
-    def model_fn(model_dir):
+    def model_fn(self, model_dir):
         """
         Initialize the FileLoader with configurations.
         This is called by SageMaker when starting the model server.
@@ -35,7 +35,7 @@ class MyHandler(default_inference_handler.DefaultInferenceHandler):
         )
         
         # Get analyzer configuration
-        analyzer_config = get_analyzer_config()
+        analyzer_config = self.get_analyzer_config()
         
         # Initialize FileLoader with configurations
         loader = FileLoader(
@@ -50,7 +50,7 @@ class MyHandler(default_inference_handler.DefaultInferenceHandler):
         
         return loader
 
-    def input_fn(request_body, request_content_type):
+    def input_fn(self, request_body, request_content_type):
         """
         Parse input data coming from SageMaker invocations.
         Expects JSON with file_location.
@@ -81,7 +81,7 @@ class MyHandler(default_inference_handler.DefaultInferenceHandler):
         
         return input_data['file_location']
 
-    def predict_fn(file_location, model):
+    def predict_fn(self, file_location, model):
         """
         Process file using FileLoader.
         Args:
