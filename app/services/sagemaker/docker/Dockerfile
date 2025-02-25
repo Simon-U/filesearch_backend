@@ -1,5 +1,5 @@
 # Using official PyTorch image as base with CUDA support
-FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn8-runtime
+FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
