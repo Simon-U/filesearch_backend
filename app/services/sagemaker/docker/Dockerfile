@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     build-essential \
+    g++ \
+    gcc \
     libpq-dev \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
@@ -23,17 +25,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-setuptools
 
-# Install CUDA toolkit
+# Install CUDA toolkit with required components
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb \
     && dpkg -i cuda-keyring_1.0-1_all.deb \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     cuda-toolkit-12-1 \
+    cuda-nvcc-12-1 \
+    cuda-compiler-12-1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set CUDA environment variables
 ENV PATH="/usr/local/cuda-12.1/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
+# Set CUDA architecture list for PyTorch extensions
+ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
+# Set correct compiler for PyTorch
+ENV CXX=g++
 
 # Create directory for virtual environment
 RUN mkdir -p /opt/venv
@@ -82,6 +90,10 @@ RUN /opt/venv/bin/pip install --no-cache-dir \
     boto3==1.35.63 \
     psycopg2==2.9.10
 
+# Pre-build custom CUDA kernels for transformers
+RUN cd /opt/venv/lib/python3.10/site-packages/transformers/kernels/deformable_detr && \
+    FORCE_CUDA=1 /opt/venv/bin/python -m torch.utils.cpp_extension build
+
 # Install the rest of requirements with retries
 RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt || \
     (sleep 5 && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt) || \
@@ -106,6 +118,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     ca-certificates \
     libpq5 \
+    g++ \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
     python3.10 \
@@ -117,20 +130,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-11-jre-
 # Set JAVA_HOME environment variable
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
-# Install CUDA runtime only (not full toolkit)
+# Install CUDA runtime and compilation tools
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb \
     && dpkg -i cuda-keyring_1.0-1_all.deb \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     cuda-runtime-12-1 \
+    cuda-nvcc-12-1 \
+    cuda-compiler-12-1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set CUDA environment variables
 ENV PATH="/usr/local/cuda-12.1/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda-12.1/lib64:${LD_LIBRARY_PATH}"
+# Set CUDA architecture list for PyTorch extensions
+ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
+# Set correct compiler for PyTorch
+ENV CXX=g++
 
 # Copy virtual environment from builder stage (which already includes sagemaker-inference and multi-model-server)
 COPY --from=builder /opt/venv /opt/venv
+# Copy pre-built CUDA kernels
+COPY --from=builder /root/.cache/torch_extensions /root/.cache/torch_extensions
 
 # Set environment to use virtual environment
 ENV PATH="/opt/venv/bin:${PATH}"
