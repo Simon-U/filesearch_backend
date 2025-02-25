@@ -59,18 +59,16 @@ RUN pip install --no-cache-dir \
     office365-rest-python-client==2.4.1 \
     psycopg2==2.9.10
 
-
 # Install the rest of requirements with retries
-RUN pip install --no-cache-dir --no-deps -r /tmp/filtered_requirements.txt || \
-    (sleep 5 && pip install --no-cache-dir --no-deps -r /tmp/filtered_requirements.txt) || \
-    (sleep 10 && pip install --no-cache-dir --no-deps -r /tmp/filtered_requirements.txt)
+RUN pip install --no-cache-dir --no-deps -r /tmp/requirements.txt || \
+    (sleep 5 && pip install --no-cache-dir --no-deps -r /tmp/requirements.txt) || \
+    (sleep 10 && pip install --no-cache-dir --no-deps -r /tmp/requirements.txt)
 
 # Now install dependencies of the requirements, but don't allow upgrading critical packages
-RUN pip install --no-cache-dir --upgrade-strategy only-if-needed -r /tmp/filtered_requirements.txt
+RUN pip install --no-cache-dir --upgrade-strategy only-if-needed -r /tmp/requirements.txt
 
 # Remove the token from the requirements file for security
 RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
-RUN rm -f /tmp/filtered_requirements.txt
 
 # Install the SageMaker Inference Toolkit and Multi Model Server
 RUN pip install --no-cache-dir multi-model-server sagemaker-inference
