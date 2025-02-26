@@ -63,7 +63,7 @@ RUN mkdir -p /root/.cache/torch_extensions
 RUN python -c "import torch; \
     try: \
     from transformers.kernels.deformable_detr import MultiScaleDeformableAttention; \
-    print('Successfully imported MultiScaleDeformableAttention') \
+    print('Successfully imported MultiScaleDeformableAttention'); \
     except ImportError as e: \
     print(f'Could not import MultiScaleDeformableAttention: {e}'); \
     except Exception as e: \
