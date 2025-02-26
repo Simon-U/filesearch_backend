@@ -173,7 +173,7 @@ def predict_fn(file_location, file_loader):
         
         return {
             'status': 'success',
-            'document': document,
+            'document': document_markdown,
             'metadata': metadata,
             'error': None
         }
