@@ -7,7 +7,7 @@ from fileloader.loader import FileLoader
 from fileloader.models import SharePointConfig, FileLocation, StorageType
 from fileloader.image_processor.analyzer import AnalyzerConfig
 from sagemaker_inference import content_types
-from docling_core.document import ImageRefMode
+from docling_core.types.doc import ImageRefMode
 
 # Set up basic logging to stdout
 logger = logging.getLogger(__name__)
