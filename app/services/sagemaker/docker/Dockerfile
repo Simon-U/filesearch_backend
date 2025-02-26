@@ -92,8 +92,8 @@ ENV PYTHONPATH=/opt/ml/code
 # Set any default environment variables for your inference script if needed
 
 # Classification settings
-ENV CLASSIFICATION_BACKEND_TYPE=dino
-ENV MODEL_NAME=facebook/dinov2-base
+ENV CLASSIFICATION_BACKEND_TYPE=deit
+ENV MODEL_NAME=facebook/deit-base-patch16-224
 
 # Captioning settings
 ENV CAPTION_BACKEND_TYPE=smolvlm
