@@ -2,10 +2,12 @@ import os
 import json
 import torch
 import logging
+from datetime import datetime
 from fileloader.loader import FileLoader
 from fileloader.models import SharePointConfig, FileLocation, StorageType
 from fileloader.image_processor.analyzer import AnalyzerConfig
 from sagemaker_inference import content_types
+from docling.core.document import ImageRefMode
 
 # Set up basic logging to stdout
 logger = logging.getLogger(__name__)
@@ -19,6 +21,17 @@ if not logger.handlers:
 # Global file loader instance to share between functions
 _file_loader = None
 _initialized = False
+
+# Custom JSON encoder to handle datetime objects and other non-serializable types
+class FileMetadataJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif hasattr(obj, '__dict__'):
+            # Handle custom objects by converting to dict
+            return {key: value for key, value in obj.__dict__.items() 
+                    if not key.startswith('_')}
+        return super().default(obj)
 
 def get_analyzer_config():
     """Get analyzer configuration from environment variables or defaults."""
@@ -156,6 +169,8 @@ def predict_fn(file_location, file_loader):
         document, metadata = file_loader.load(file_location)
         logger.info(f"Document processed successfully, metadata length: {len(str(metadata))}")
         
+        document_markdown = document.document.export_to_markdown(image_placeholder='', image_mode=ImageRefMode) if hasattr(document, 'document') else str(document)
+        
         return {
             'status': 'success',
             'document': document,
@@ -190,7 +205,29 @@ def output_fn(prediction, response_content_type):
     
     if content_type == content_types.JSON:
         logger.info("Formatting response as JSON")
-        return json.dumps(prediction), content_types.JSON
+        try:
+            # Use our custom JSON encoder to handle metadata serialization
+            serialized = json.dumps(prediction, cls=FileMetadataJSONEncoder)
+            logger.info(f"Successfully serialized response, length: {len(serialized)}")
+            return serialized, content_types.JSON
+        except Exception as e:
+            logger.error(f"Error serializing prediction to JSON: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            
+            # Return a simplified error response that we know can be serialized
+            error_response = {
+                'status': 'error',
+                'error': f"Error serializing response: {str(e)}",
+                'document': None,
+                'metadata': None
+            }
+            return json.dumps(error_response), content_types.JSON
     else:
         logger.warning(f"Unsupported content type: {content_type}, using JSON instead")
-        return json.dumps(prediction), content_types.JSON
+        return json.dumps({
+            'status': 'error',
+            'error': f"Unsupported content type: {content_type}",
+            'document': None, 
+            'metadata': None
+        }), content_types.JSON
