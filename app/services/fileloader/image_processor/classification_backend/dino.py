@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Tuple
 from PIL import Image
 import numpy as np
 from .base import BaseClassificationBackend
-from transformers import AutoFeatureExtractor, AutoModel
+from transformers import ViTImageProcessor, AutoModel
 from contextlib import contextmanager
 import gc
 
@@ -29,8 +29,10 @@ class DINOClassificationBackend(BaseClassificationBackend):
                 # Default to DINO V2 base model if a specific DINO model isn't specified
                 model_name = "facebook/dinov2-base"
             
-            self.processor = AutoFeatureExtractor.from_pretrained(
-                model_name,
+            # Use ViTImageProcessor instead of AutoFeatureExtractor for DINO V2
+            # This is more reliable as DINO V2 is based on the ViT architecture
+            self.processor = ViTImageProcessor.from_pretrained(
+                "facebook/dinov2-base",  # Use ViT processor which is compatible
                 cache_dir=self.config.cache_dir,
                 token=self.config.hf_token
             )
