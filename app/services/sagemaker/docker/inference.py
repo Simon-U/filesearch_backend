@@ -43,8 +43,13 @@ def get_analyzer_config():
         device="cuda" if torch.cuda.is_available() else "cpu",
         use_half_precision=os.getenv('USE_HALF_PRECISION', 'true').lower() == 'true',
         optimize_memory_usage=True,
+        # Classification configuration
+        classification_backend_type=os.getenv('CLASSIFICATION_BACKEND_TYPE', 'clip'),
+        # Captioning configuration
         enable_captioning=os.getenv('ENABLE_CAPTIONING', 'true').lower() == 'true',
-        caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base')
+        caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base'),
+        caption_backend_type=os.getenv('CAPTION_BACKEND_TYPE', 'blip'),
+        max_caption_length=int(os.getenv('MAX_CAPTION_LENGTH', '150'))
     )
 
 def model_fn(model_dir):

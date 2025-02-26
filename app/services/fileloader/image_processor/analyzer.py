@@ -8,14 +8,9 @@ from contextlib import contextmanager
 from .base import ImageAnalyzer, ImageAnalysisResult, ImageRelevance
 from docling_core.types.doc import DoclingDocument, PictureItem
 
-from transformers import (
-    AutoProcessor, 
-    AutoModelForZeroShotImageClassification,
-    BlipProcessor,
-    BlipForConditionalGeneration
-)
-
-
+# Import the backend factories
+from .caption_backend import CaptioningBackendFactory
+from .classification_backend import ClassificationBackendFactory
 
 @contextmanager
 def torch_gc_context():
@@ -37,9 +32,16 @@ class AnalyzerConfig:
     confidence_threshold: float = 0.5
     cache_dir: Optional[str] = None
     max_batch_size: int = 1  # Process one image at a time by default
+    
+    # Classification configuration
+    classification_backend_type: str = "clip"  # New field to select classification backend
+    
+    # Captioning configuration
     enable_captioning: bool = True
     caption_model: str = "Salesforce/blip-image-captioning-base"
+    caption_backend_type: str = "blip"  # Field to select captioning backend
     max_caption_length: int = 150
+    
     # Memory management options
     use_half_precision: bool = True  # Use FP16 for models
     optimize_memory_usage: bool = True  # Enable memory optimization features
@@ -65,121 +67,6 @@ class ImageAnalyzerFactory:
             
         analyzer_class = cls._analyzers[config.model_type]
         return analyzer_class(config)
-    
-class BaseImageBackend:
-    def __init__(self, config: AnalyzerConfig):
-        self.config = config
-        self.model = None
-        self.processor = None
-        
-    def to_device(self, inputs):
-        """Helper to move inputs to device with memory optimization"""
-        if isinstance(inputs, dict):
-            return {k: self.to_device(v) for k, v in inputs.items()}
-        elif isinstance(inputs, (list, tuple)):
-            return type(inputs)(self.to_device(v) for v in inputs)
-        elif hasattr(inputs, 'to'):
-            return inputs.to(self.config.device)
-        return inputs
-
-class CLIPImageBackend(BaseImageBackend):
-    def initialize(self):
-        with torch_gc_context():
-            self.processor = AutoProcessor.from_pretrained(
-                self.config.model_name,
-                cache_dir=self.config.cache_dir,
-                token=self.config.hf_token
-            )
-            self.model = AutoModelForZeroShotImageClassification.from_pretrained(
-                self.config.model_name,
-                cache_dir=self.config.cache_dir,
-                token=self.config.hf_token,
-                torch_dtype=torch.float16 if self.config.use_half_precision else torch.float32
-            ).to(self.config.device)
-            
-            if self.config.optimize_memory_usage:
-                self.model.eval()  # Ensure eval mode
-                
-            self.categories = [
-                "chart", "diagram", "graph", "logo", "decorative element",
-                "technical drawing", "data visualization", "infographic"
-            ]
-
-    def analyze(self, image: Image.Image) -> Dict[str, Any]:
-        try:
-            with torch_gc_context(), torch.no_grad():
-                inputs = self.processor(
-                    images=image,
-                    text=self.categories,
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    max_length=77
-                )
-                inputs = self.to_device(inputs)
-                
-                outputs = self.model(**inputs)
-                probs = outputs.logits_per_image.softmax(dim=1)[0].cpu()
-
-                return {
-                    "classifications": [
-                        {"category": cat, "confidence": prob.item()}
-                        for cat, prob in zip(self.categories, probs)
-                    ],
-                    "top_category": self.categories[probs.argmax().item()],
-                    "confidence": probs.max().item()
-                }
-        except Exception as e:
-            return {
-                "classifications": [],
-                "top_category": "unknown",
-                "confidence": 0.0,
-                "error": str(e)
-            }
-
-class CaptioningImageBackend(BaseImageBackend):
-    def initialize(self):
-        with torch_gc_context():
-            model_kwargs = {
-                'cache_dir': self.config.cache_dir,
-                'torch_dtype': torch.float16 if self.config.use_half_precision else torch.float32
-            }
-            
-            model_kwargs['token'] = self.config.hf_token
-            self.processor = BlipProcessor.from_pretrained(
-                self.config.caption_model,
-                **model_kwargs
-            )
-            self.model = BlipForConditionalGeneration.from_pretrained(
-                self.config.caption_model,
-                **model_kwargs
-            ).to(self.config.device)
-            
-            if self.config.optimize_memory_usage:
-                self.model.eval()
-
-    def analyze(self, image: Image.Image) -> Dict[str, Any]:
-        try:
-            with torch_gc_context(), torch.no_grad():
-                inputs = self.processor(image, return_tensors="pt")
-                inputs = self.to_device(inputs)
-                
-                generated_ids = self.model.generate(
-                    **inputs,
-                    max_new_tokens=self.config.max_caption_length,
-                    num_beams=1  # Reduce beam search complexity
-                )
-                caption = self.processor.decode(generated_ids[0], skip_special_tokens=True)
-                
-                return {
-                    "caption": caption,
-                    "confidence": 1.0
-                }
-        except Exception as e:
-            return {
-                "caption": "",
-                "error": str(e)
-            }
 
 @ImageAnalyzerFactory.register("transformer")
 class TransformerImageAnalyzer(ImageAnalyzer):
@@ -191,12 +78,36 @@ class TransformerImageAnalyzer(ImageAnalyzer):
         
     def _initialize_backends(self):
         with torch_gc_context():
-            self.classification_backend = CLIPImageBackend(self.config)
-            self.classification_backend.initialize()
+            # Initialize classification backend using the factory
+            try:
+                self.classification_backend = ClassificationBackendFactory.get_backend(
+                    self.config.classification_backend_type,
+                    self.config
+                )
+                self.classification_backend.initialize()
+            except Exception as e:
+                import logging
+                logger = logging.getLogger("fileloader")
+                logger.error(
+                    f"Failed to initialize classification backend '{self.config.classification_backend_type}': {e}"
+                )
+                raise  # Classification is essential, so raise the error
             
+            # Initialize captioning backend using the factory
             if self.config.enable_captioning:
-                self.caption_backend = CaptioningImageBackend(self.config)
-                self.caption_backend.initialize()
+                try:
+                    self.caption_backend = CaptioningBackendFactory.get_backend(
+                        self.config.caption_backend_type,
+                        self.config
+                    )
+                    self.caption_backend.initialize()
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger("fileloader")
+                    logger.error(
+                        f"Failed to initialize captioning backend '{self.config.caption_backend_type}': {e}"
+                    )
+                    self.caption_backend = None
     
     def _is_substantive_category(self, category: str) -> bool:
         substantive_categories = {
@@ -240,14 +151,16 @@ class TransformerImageAnalyzer(ImageAnalyzer):
                     caption_result = self.caption_backend.analyze(image)
                     caption = caption_result.get("caption", "")
                 except Exception as e:
-                    print(f"Caption generation failed: {e}")
+                    import logging
+                    logger = logging.getLogger("fileloader")
+                    logger.error(f"Caption generation failed: {e}")
 
         return ImageAnalysisResult(
             relevance=ImageRelevance.SUBSTANTIVE if is_substantive else ImageRelevance.DECORATIVE,
             description=caption if caption else f"Image classified as {top_category}",
             confidence=confidence,
             metadata={
-                "classifications": classification["classifications"],
+                "classifications": classification.get("classifications", []),
                 "category": top_category,
                 "caption": caption
             }

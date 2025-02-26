@@ -321,7 +321,7 @@ class SageMakerFileLoader:
         # If we get here, the job is still in progress
         return result
 
-    def wait_for_async_result(self, request_id: str, check_interval: int = 30, timeout: int = 3600) -> Dict:
+    def wait_for_async_result(self, request_id: str, check_interval: int = 20, timeout: int = 3600) -> Dict:
         """
         Wait for an asynchronous inference request to complete
         

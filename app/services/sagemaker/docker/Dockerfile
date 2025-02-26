@@ -90,12 +90,21 @@ RUN chmod -R 755 /opt/ml/code
 ENV PYTHONPATH=/opt/ml/code
 
 # Set any default environment variables for your inference script if needed
+
+# Classification settings
+ENV CLASSIFICATION_BACKEND_TYPE=dino
+ENV MODEL_NAME=facebook/dinov2-base
+
+# Captioning settings
+ENV CAPTION_BACKEND_TYPE=smolvlm
+ENV CAPTION_MODEL=HuggingFaceTB/SmolVLM-Instruct
+
+# General settings
 ENV MODEL_TYPE=transformer
-ENV MODEL_NAME=openai/clip-vit-base-patch32
 ENV CONFIDENCE_THRESHOLD=0.4
-ENV USE_HALF_PRECISION=true
+ENV USE_HALF_PRECISION=false
 ENV ENABLE_CAPTIONING=true
-ENV CAPTION_MODEL=Salesforce/blip-image-captioning-base
+ENV MAX_CAPTION_LENGTH=400
 
 # Set environment variables for SageMaker inference
 ENV SAGEMAKER_PROGRAM=inference.py
