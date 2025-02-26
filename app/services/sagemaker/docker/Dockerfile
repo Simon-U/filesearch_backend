@@ -1,8 +1,11 @@
 # Using official PyTorch image as base with CUDA support
-FROM pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime
+FROM pytorch/pytorch:2.6.0-cuda12.1-cudnn8-runtime
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
+
+# Verify Python version
+RUN python3 --version | grep -E "3\.10\.|3\.11\." || (echo "Unsupported Python version" && exit 1)
 
 # Install system dependencies including libssl-dev for OpenSSL
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,7 +30,7 @@ ENV FORCE_CUDA=1
 # Accept GitHub token as a build argument
 ARG GITHUB_TOKEN
 
-# Configure Git to use HTTPS instead of SSH
+# Configure Git to use HTTPS instead of SSH with token support
 RUN git config --global url."https://".insteadOf git:// && \
     git config --global url."https://".insteadOf ssh:// && \
     git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
@@ -35,40 +38,11 @@ RUN git config --global url."https://".insteadOf git:// && \
 # Copy the requirements file from the repository root
 COPY requirements.txt /tmp/requirements.txt
 
-# Replace placeholder in requirements.txt with the actual GitHub token
-RUN if [ -n "$GITHUB_TOKEN" ]; then \
-    sed -i "s|__GITHUB_TOKEN__|${GITHUB_TOKEN}|g" /tmp/requirements.txt; \
-    fi
-
-# Fix OpenSSL compatibility issues by installing specific versions
-RUN pip install --no-cache-dir \
-    pyOpenSSL==19.1.0 \
-    cryptography==36.0.0 \
-    urllib3==1.26.12 \
-    boto3==1.24.59 \
-    botocore==1.27.59
-
-# Install pydantic first to ensure correct version
-RUN pip install --no-cache-dir "pydantic>=2.10.5,<3.0.0"
-
-# Install key packages separately
-RUN pip install --no-cache-dir \
-    transformers==4.48.1 \
-    Pillow==10.4.0 \
-    pandas==2.2.3 \
-    office365-rest-python-client==2.4.1 \
-    psycopg2==2.9.10
-
-# Install the rest of requirements with retries
-RUN pip install --no-cache-dir --no-deps -r /tmp/requirements.txt || \
-    (sleep 5 && pip install --no-cache-dir --no-deps -r /tmp/requirements.txt) || \
-    (sleep 10 && pip install --no-cache-dir --no-deps -r /tmp/requirements.txt)
-
-# Now install dependencies of the requirements, but don't allow upgrading critical packages
-RUN pip install --no-cache-dir --upgrade-strategy only-if-needed -r /tmp/requirements.txt
-
-# Remove the token from the requirements file for security
-RUN sed -i 's|${GITHUB_TOKEN}|****|g' /tmp/requirements.txt
+# Install requirements in one pass with error handling
+RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
+    (sleep 5 && pip install --no-cache-dir -r /tmp/requirements.txt) || \
+    (sleep 10 && pip install --no-cache-dir -r /tmp/requirements.txt) || \
+    (echo "Failed to install requirements" && exit 1)
 
 # Install the SageMaker Inference Toolkit and Multi Model Server
 RUN pip install --no-cache-dir multi-model-server sagemaker-inference
