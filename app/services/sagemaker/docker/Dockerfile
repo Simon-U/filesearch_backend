@@ -45,7 +45,7 @@ RUN git config --global url."https://".insteadOf git:// && \
 # Build torchvision from source without CUDA to avoid CUDA_HOME issues
 RUN pip install --no-cache-dir torch==2.6.0 torchvision==0.21.0 --extra-index-url https://download.pytorch.org/whl/cu121 && \
     # Create a small test script to verify installation
-    python -c "import torch; import torchvision; print(f'PyTorch: {torch.__version__}, torchvision: {torchvision.__version__}, CUDA available: {torch.cuda.is_available()}')
+    python -c "import torch; import torchvision; print(f'PyTorch: {torch.__version__}, torchvision: {torchvision.__version__}, CUDA available: {torch.cuda.is_available()}')"
 # Copy the requirements file from the repository root
 COPY requirements.txt /tmp/requirements.txt
 
