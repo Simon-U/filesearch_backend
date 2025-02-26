@@ -18,6 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libssl-dev \
     openjdk-11-jre-headless \
+    g++ \
+    make \
+    cmake \
+    ninja-build \
     && rm -rf /var/lib/apt/lists/*
 
 # Set JAVA_HOME environment variable for MMS
@@ -43,6 +47,14 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
     (sleep 5 && pip install --no-cache-dir -r /tmp/requirements.txt) || \
     (sleep 10 && pip install --no-cache-dir -r /tmp/requirements.txt) || \
     (echo "Failed to install requirements" && exit 1)
+
+# Rebuild torchvision from source to ensure compatibility with installed PyTorch
+RUN pip uninstall -y torchvision && \
+    git clone https://github.com/pytorch/vision.git && \
+    cd vision && \
+    python setup.py install && \
+    cd .. && \
+    rm -rf vision
 
 # Install the SageMaker Inference Toolkit and Multi Model Server
 RUN pip install --no-cache-dir multi-model-server sagemaker-inference
