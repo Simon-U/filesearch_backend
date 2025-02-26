@@ -19,7 +19,8 @@ dependencies = [
     "fastapi (>=0.115.8,<0.116.0)",
     "sagemaker (>=2.240.0,<3.0.0)",
     "torchvision (==0.17.2)",
-    "torch (==2.2.2)"
+    "torch (==2.2.2)",
+    "cryptography (<43)"
 ]
 
 
