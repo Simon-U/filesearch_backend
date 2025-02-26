@@ -34,6 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Set JAVA_HOME environment variable for MMS
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PYTHONPATH=/usr/local/lib/python3.10/site-packages:${PYTHONPATH}
 
 # Accept GitHub token as a build argument
 ARG GITHUB_TOKEN
@@ -48,6 +49,9 @@ COPY requirements.txt /tmp/requirements.txt
 
 # Install requirements in one pass with error handling
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+RUN pip list | grep docling
+RUN find / -name docling -type d 2>/dev/null
 
 # Verify CUDA toolkit installation
 RUN ls -la ${CUDA_HOME}/bin/nvcc || echo "nvcc not found - this is expected in devel image"
