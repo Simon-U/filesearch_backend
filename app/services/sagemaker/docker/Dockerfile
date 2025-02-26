@@ -59,15 +59,6 @@ RUN ls -la ${CUDA_HOME}/bin/nvcc || echo "nvcc not found - this is expected in d
 RUN python -c "import torch; print(f'PyTorch version: {torch.__version__}, CUDA available: {torch.cuda.is_available()}')"
 RUN mkdir -p /root/.cache/torch_extensions
 
-# Try to pre-compile the MultiScaleDeformableAttention custom kernel
-RUN python -c "import torch; \
-    try: \
-    from transformers.kernels.deformable_detr import MultiScaleDeformableAttention; \
-    print('Successfully imported MultiScaleDeformableAttention'); \
-    except ImportError as e: \
-    print(f'Could not import MultiScaleDeformableAttention: {e}'); \
-    except Exception as e: \
-    print(f'Error initializing MultiScaleDeformableAttention: {e}')"
 
 # Install the SageMaker Inference Toolkit and Multi Model Server
 RUN pip install --no-cache-dir multi-model-server sagemaker-inference
