@@ -169,7 +169,7 @@ def predict_fn(file_location, file_loader):
         document, metadata = file_loader.load(file_location)
         logger.info(f"Document processed successfully, metadata length: {len(str(metadata))}")
         
-        document_markdown = document.document.export_to_markdown(image_placeholder='', image_mode=ImageRefMode) if hasattr(document, 'document') else str(document)
+        document_markdown = document.document.export_to_markdown(image_placeholder='', image_mode=ImageRefMode.PLACEHOLDER) if hasattr(document, 'document') else str(document)
         
         return {
             'status': 'success',
