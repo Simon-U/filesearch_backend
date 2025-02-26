@@ -47,7 +47,7 @@ RUN git config --global url."https://".insteadOf git:// && \
 COPY requirements.txt /tmp/requirements.txt
 
 # Install requirements in one pass with error handling
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Verify CUDA toolkit installation
 RUN ls -la ${CUDA_HOME}/bin/nvcc || echo "nvcc not found - this is expected in devel image"
