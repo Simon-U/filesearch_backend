@@ -1,10 +1,10 @@
 # Using official PyTorch image as base with CUDA support
-FROM pytorch/pytorch:2.6.0-cuda12.6-cudnn9-runtime
+FROM pytorch/pytorch:2.2.2-cuda11.8-cudnn8-runtime
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Set CUDA environment variables
+
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
@@ -42,8 +42,6 @@ RUN git config --global url."https://".insteadOf git:// && \
     git config --global url."https://".insteadOf ssh:// && \
     git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 
-# Build torchvision from source without CUDA to avoid CUDA_HOME issues
-RUN pip install --no-cache-dir torch==2.6.0 torchvision==0.21.0 --extra-index-url https://download.pytorch.org/whl/cu126
 
 COPY requirements.txt /tmp/requirements.txt
 

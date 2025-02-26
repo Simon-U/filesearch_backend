@@ -8,7 +8,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10,<=3.11.11"
 dependencies = [
-    "docling (>=2.24.0,<3.0.0)",
+    "docling (==2.24.0)",
     "llvmlite (>=0.44.0,<0.45.0)",
     "bertopic (>=0.16.4,<0.17.0)",
     "agent-toolbox @ git+https://github.com/Simon-U/agent-toolbox.git",
@@ -18,10 +18,21 @@ dependencies = [
     "msal (>=1.31.1,<2.0.0)",
     "fastapi (>=0.115.8,<0.116.0)",
     "sagemaker (>=2.240.0,<3.0.0)",
-    "torchvision (==0.21.0)"
+    "torchvision (==0.17.2)",
+    "torch (==2.2.2)"
 ]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118/"
+priority = "supplemental"
+
+
+[tool.poetry.dependencies]
+torch = {source = "pytorch-cu118"}
+torchvision = {source = "pytorch-cu118"}
