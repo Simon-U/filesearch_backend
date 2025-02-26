@@ -42,6 +42,10 @@ RUN git config --global url."https://".insteadOf git:// && \
     git config --global url."https://".insteadOf ssh:// && \
     git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 
+# Build torchvision from source without CUDA to avoid CUDA_HOME issues
+RUN pip install --no-cache-dir torch==2.6.0 torchvision==0.21.0 --extra-index-url https://download.pytorch.org/whl/cu121 && \
+    # Create a small test script to verify installation
+    python -c "import torch; import torchvision; print(f'PyTorch: {torch.__version__}, torchvision: {torchvision.__version__}, CUDA available: {torch.cuda.is_available()}')
 # Copy the requirements file from the repository root
 COPY requirements.txt /tmp/requirements.txt
 
@@ -51,11 +55,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
     (sleep 10 && pip install --no-cache-dir -r /tmp/requirements.txt) || \
     (echo "Failed to install requirements" && exit 1)
 
-# Build torchvision from source without CUDA to avoid CUDA_HOME issues
-RUN pip uninstall -y torch torchvision && \
-    pip install --no-cache-dir torch==2.6.0 torchvision==0.21.0 --extra-index-url https://download.pytorch.org/whl/cu121 && \
-    # Create a small test script to verify installation
-    python -c "import torch; import torchvision; print(f'PyTorch: {torch.__version__}, torchvision: {torchvision.__version__}, CUDA available: {torch.cuda.is_available()}')
+
 
 # Install the SageMaker Inference Toolkit and Multi Model Server
 RUN pip install --no-cache-dir multi-model-server sagemaker-inference
