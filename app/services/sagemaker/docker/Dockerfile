@@ -52,13 +52,10 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
     (echo "Failed to install requirements" && exit 1)
 
 # Build torchvision from source without CUDA to avoid CUDA_HOME issues
-RUN pip uninstall -y torchvision && \
-    git clone https://github.com/pytorch/vision.git && \
-    cd vision && \
-    git checkout v0.17.0 && \
-    FORCE_CUDA=0 python setup.py install && \
-    cd .. && \
-    rm -rf vision
+RUN pip uninstall -y torch torchvision && \
+    pip install --no-cache-dir torch==2.6.0 torchvision==0.21.0 --extra-index-url https://download.pytorch.org/whl/cu121 && \
+    # Create a small test script to verify installation
+    python -c "import torch; import torchvision; print(f'PyTorch: {torch.__version__}, torchvision: {torchvision.__version__}, CUDA available: {torch.cuda.is_available()}')
 
 # Install the SageMaker Inference Toolkit and Multi Model Server
 RUN pip install --no-cache-dir multi-model-server sagemaker-inference
