@@ -71,6 +71,7 @@ RUN mkdir -p /opt/ml/model /opt/ml/code
 COPY app/services/fileloader /opt/ml/code/fileloader
 COPY app/services/sagemaker/docker/inference.py /opt/ml/code/inference.py
 COPY app/services/sagemaker/docker/serve.py /opt/ml/code/serve.py
+COPY app/services/fileloader/image_processor/model_cache_manager /opt/ml/code/model_cache_manager
 
 # Add patch for graceful fallback when CUDA kernels fail
 RUN echo 'import transformers.kernels.deformable_detr.cuda.ms_deform_attn_cuda\nimport sys\n\n# Add CPU fallback for deformable attention\ndef cpu_fallback(*args, **kwargs):\n    print("Using CPU fallback for deformable attention", file=sys.stderr)\n    from transformers.kernels.deformable_detr.cpu.ms_deform_attn_cpu import ms_deform_attn_cpu_forward\n    return ms_deform_attn_cpu_forward(*args, **kwargs)\n\n# Attempt to patch the module if custom CUDA kernel fails\ntry:\n    transformers.kernels.deformable_detr.cuda.ms_deform_attn_cuda.ms_deform_attn_cuda_forward\nexcept (AttributeError, ImportError):\n    transformers.kernels.deformable_detr.cuda.ms_deform_attn_cuda.ms_deform_attn_cuda_forward = cpu_fallback\n' > /opt/ml/code/cuda_patches.py
@@ -96,7 +97,7 @@ ENV CLASSIFICATION_MODEL=openai/clip-vit-base-patch32
 ENV MODEL_TYPE=transformer
 
 # Default Captioning settings
-ENV CAPTION_BACKEND_TYPE=bilp
+ENV CAPTION_BACKEND_TYPE=blip
 ENV CAPTION_MODEL=Salesforce/blip2-flan-t5-xl
 ENV ENABLE_CAPTIONING=true
 ENV MAX_CAPTION_LENGTH=400

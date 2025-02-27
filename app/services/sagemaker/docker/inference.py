@@ -35,6 +35,17 @@ class FileMetadataJSONEncoder(json.JSONEncoder):
 
 def get_analyzer_config():
     """Get analyzer configuration from environment variables or defaults."""
+    # Set S3 bucket if it's not set (for model caching)
+    if 'MODEL_CACHE_BUCKET' not in os.environ and 'S3_BUCKET' in os.environ:
+        os.environ['MODEL_CACHE_BUCKET'] = os.environ['S3_BUCKET']
+        
+    # Set model cache directory
+    if 'MODEL_CACHE_DIR' not in os.environ:
+        os.environ['MODEL_CACHE_DIR'] = '/opt/ml/models'
+        
+    # Ensure model cache directory exists
+    os.makedirs(os.environ['MODEL_CACHE_DIR'], exist_ok=True)
+    
     return AnalyzerConfig(
         hf_token=os.getenv('HF_TOKEN'),
         model_type=os.getenv('MODEL_TYPE', "transformer"),
@@ -47,8 +58,11 @@ def get_analyzer_config():
         confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', "0.4")),
         #Caption backend
         enable_captioning=os.getenv('ENABLE_CAPTIONING', 'true').lower() == 'true',
-        caption_backend_type=os.getenv('CAPTION_BACKEND_TYPE', 'bilp'),
-        caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base')
+        caption_backend_type=os.getenv('CAPTION_BACKEND_TYPE', 'blip'),
+        caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base'),
+        max_caption_length=int(os.getenv('MAX_CAPTION_LENGTH', '400')),
+        # Cache directory
+        cache_dir=os.environ.get('MODEL_CACHE_DIR', '/opt/ml/models')
     )
 
 def model_fn(model_dir):
@@ -111,7 +125,10 @@ def input_fn(request_body, request_content_type):
         FileLocation object for document processing
     """
     logger.info(f"input_fn called with content_type: {request_content_type}")
-    logger.info(f"request_body: {request_body}")
+    logger.info(f"request_body (truncated): {request_body[:500] if len(request_body) > 500 else request_body}")
+    
+    from huggingface_hub import login
+    login(token=os.environ.get('HF_TOKEN'))
     
     global _initialized, _file_loader
     
@@ -121,7 +138,7 @@ def input_fn(request_body, request_content_type):
     try:
         # Decode JSON input
         input_data = json.loads(request_body)
-        logger.info(f"Parsed JSON input: {input_data}")
+        logger.info(f"Parsed JSON input (truncated): {str(input_data)[:500] if len(str(input_data)) > 500 else str(input_data)}")
         
         if 'file_location' not in input_data:
             raise ValueError("Input must contain 'file_location'")
@@ -146,6 +163,11 @@ def input_fn(request_body, request_content_type):
             if 'general' in config:
                 os.environ['CONFIDENCE_THRESHOLD'] = str(config['general'].get('confidence_threshold', os.environ.get('CONFIDENCE_THRESHOLD', '0.4')))
                 os.environ['USE_HALF_PRECISION'] = str(config['general'].get('use_half_precision', os.environ.get('USE_HALF_PRECISION', 'false'))).lower()
+            
+            # Model caching settings
+            if 'model_cache' in config:
+                os.environ['MODEL_CACHE_BUCKET'] = config['model_cache'].get('bucket', os.environ.get('MODEL_CACHE_BUCKET', ''))
+                os.environ['MODEL_CACHE_PREFIX'] = config['model_cache'].get('prefix', os.environ.get('MODEL_CACHE_PREFIX', 'models'))
                 
             # If FileLoader already initialized with different config, reset it
             if _initialized:
