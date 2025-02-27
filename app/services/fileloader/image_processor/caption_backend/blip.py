@@ -32,7 +32,7 @@ class BlipCaptioningBackend(BaseCaptioningBackend):
     
     def initialize(self):
         logger.info(f"Initializing BLIP captioning backend with model: {self.config.caption_model}")
-        
+        logger.info(self.config)
         start_time = time.time()
         try:
             with torch_gc_context():
@@ -82,6 +82,7 @@ class BlipCaptioningBackend(BaseCaptioningBackend):
 
     def analyze(self, image: Image.Image) -> Dict[str, Any]:
         start_time = time.time()
+        logger.info("Analyse BLIPCaptionbackend")
         try:
             with torch_gc_context(), torch.no_grad():
                 # Process the image
