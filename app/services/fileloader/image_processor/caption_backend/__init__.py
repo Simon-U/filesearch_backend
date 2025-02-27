@@ -9,7 +9,7 @@ from .florence import FlorenceCaptioningBackend
 CaptioningBackendFactory.register("blip")(BlipCaptioningBackend)
 CaptioningBackendFactory.register("smolvlm")(SmolVLMCaptioningBackend)
 CaptioningBackendFactory.register("pali")(PaligemmaCaptioningBackend)
-CaptioningBackendFactory.register("pali")(FlorenceCaptioningBackend)
+CaptioningBackendFactory.register("florence")(FlorenceCaptioningBackend)
 
 __all__ = [
     "CaptioningBackendFactory",
