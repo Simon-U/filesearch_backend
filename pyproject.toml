@@ -13,14 +13,14 @@ dependencies = [
     "bertopic (>=0.16.4,<0.17.0)",
     "agent-toolbox @ git+https://github.com/Simon-U/agent-toolbox.git",
     "transformers (==4.42.0)",
-    "sentence-transformers (>=3.4.1,<4.0.0)",
     "sagemaker-inference (>=1.10.1,<2.0.0)",
     "msal (>=1.31.1,<2.0.0)",
     "fastapi (>=0.115.8,<0.116.0)",
     "sagemaker (>=2.240.0,<3.0.0)",
     "torchvision (==0.17.2)",
     "torch (==2.2.2)",
-    "cryptography (<43)"
+    "cryptography (<43)",
+    "sentence-transformers (==3.4.1)"
 ]
 
 
