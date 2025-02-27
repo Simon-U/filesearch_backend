@@ -180,6 +180,7 @@ class TransformerImageAnalyzer(ImageAnalyzer):
     def _initialize_backends(self):
         with torch_gc_context():
             # Initialize classification backend using the factory
+            logger.info(f"======= Before classification {self.config} ============")
             try:
                 self.classification_backend = ClassificationBackendFactory.get_backend(
                     self.config.classification_backend_type,
@@ -191,10 +192,11 @@ class TransformerImageAnalyzer(ImageAnalyzer):
                     f"Failed to initialize classification backend '{self.config.classification_backend_type}': {e}"
                 )
                 raise  # Classification is essential, so raise the error
-            
+            logger.info(f"======= After classification {self.config} ============")
             # Initialize captioning backend using the factory
             if self.config.enable_captioning:
                 try:
+                    logger.log(f"The configs for captiosn are {self.config}")
                     self.caption_backend = CaptioningBackendFactory.get_backend(
                         self.config.caption_backend_type,
                         self.config
