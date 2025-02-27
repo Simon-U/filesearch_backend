@@ -43,13 +43,8 @@ def get_analyzer_config():
         device="cuda" if torch.cuda.is_available() else "cpu",
         use_half_precision=os.getenv('USE_HALF_PRECISION', 'true').lower() == 'true',
         optimize_memory_usage=True,
-        # Classification configuration
-        classification_backend_type=os.getenv('CLASSIFICATION_BACKEND_TYPE', 'clip'),
-        # Captioning configuration
         enable_captioning=os.getenv('ENABLE_CAPTIONING', 'true').lower() == 'true',
-        caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base'),
-        caption_backend_type=os.getenv('CAPTION_BACKEND_TYPE', 'blip'),
-        max_caption_length=int(os.getenv('MAX_CAPTION_LENGTH', '150'))
+        caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base')
     )
 
 def model_fn(model_dir):
@@ -102,7 +97,7 @@ def model_fn(model_dir):
 def input_fn(request_body, request_content_type):
     """
     Transform input data to a FileLocation object.
-    Expects JSON with a 'file_location' key.
+    Expects JSON with a 'file_location' key and optional 'config' key.
     
     Args:
         request_body: The request payload
@@ -114,6 +109,8 @@ def input_fn(request_body, request_content_type):
     logger.info(f"input_fn called with content_type: {request_content_type}")
     logger.info(f"request_body: {request_body}")
     
+    global _initialized, _file_loader
+    
     if request_content_type != content_types.JSON:
         raise ValueError(f'Unsupported content type: {request_content_type}')
     
@@ -124,6 +121,33 @@ def input_fn(request_body, request_content_type):
         
         if 'file_location' not in input_data:
             raise ValueError("Input must contain 'file_location'")
+        
+        # Process config if provided
+        if 'config' in input_data:
+            config = input_data['config']
+            logger.info(f"Found configuration in request: {config}")
+            
+            # Set configuration in environment variables
+            if 'classification' in config:
+                os.environ['CLASSIFICATION_BACKEND_TYPE'] = config['classification'].get('backend_type', os.environ.get('CLASSIFICATION_BACKEND_TYPE', 'clip'))
+                os.environ['MODEL_NAME'] = config['classification'].get('model_name', os.environ.get('MODEL_NAME', 'openai/clip-vit-base-patch32'))
+                os.environ['MODEL_TYPE'] = config['classification'].get('model_type', os.environ.get('MODEL_TYPE', 'transformer'))
+            
+            if 'captioning' in config:
+                os.environ['CAPTION_BACKEND_TYPE'] = config['captioning'].get('backend_type', os.environ.get('CAPTION_BACKEND_TYPE', 'smolvlm'))
+                os.environ['CAPTION_MODEL'] = config['captioning'].get('model', os.environ.get('CAPTION_MODEL', 'HuggingFaceTB/SmolVLM-Instruct'))
+                os.environ['ENABLE_CAPTIONING'] = str(config['captioning'].get('enabled', os.environ.get('ENABLE_CAPTIONING', 'true'))).lower()
+                os.environ['MAX_CAPTION_LENGTH'] = str(config['captioning'].get('max_length', os.environ.get('MAX_CAPTION_LENGTH', '400')))
+            
+            if 'general' in config:
+                os.environ['CONFIDENCE_THRESHOLD'] = str(config['general'].get('confidence_threshold', os.environ.get('CONFIDENCE_THRESHOLD', '0.4')))
+                os.environ['USE_HALF_PRECISION'] = str(config['general'].get('use_half_precision', os.environ.get('USE_HALF_PRECISION', 'false'))).lower()
+                
+            # If FileLoader already initialized with different config, reset it
+            if _initialized:
+                logger.info("Configuration changed, reinitializing FileLoader")
+                _initialized = False
+                _file_loader = None
         
         file_location_data = input_data['file_location']
         

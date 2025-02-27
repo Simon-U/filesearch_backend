@@ -89,22 +89,21 @@ RUN chmod -R 755 /opt/ml/code
 # Set Python path so modules are found
 ENV PYTHONPATH=/opt/ml/code
 
-# Set any default environment variables for your inference script if needed
-
-# Classification settings
+# Set default environment variables that can be overridden by requests
+# Default Classification settings
 ENV CLASSIFICATION_BACKEND_TYPE=clip
 ENV MODEL_NAME=openai/clip-vit-base-patch32
+ENV MODEL_TYPE=transformer
 
-# Captioning settings
+# Default Captioning settings
 ENV CAPTION_BACKEND_TYPE=smolvlm
 ENV CAPTION_MODEL=HuggingFaceTB/SmolVLM-Instruct
-
-# General settings
-ENV MODEL_TYPE=transformer
-ENV CONFIDENCE_THRESHOLD=0.4
-ENV USE_HALF_PRECISION=false
 ENV ENABLE_CAPTIONING=true
 ENV MAX_CAPTION_LENGTH=400
+
+# Default General settings
+ENV CONFIDENCE_THRESHOLD=0.4
+ENV USE_HALF_PRECISION=false
 
 # Set environment variables for SageMaker inference
 ENV SAGEMAKER_PROGRAM=inference.py
