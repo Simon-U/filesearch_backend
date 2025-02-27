@@ -32,53 +32,49 @@ class BlipCaptioningBackend(BaseCaptioningBackend):
     
     def initialize(self):
         logger.info(f"Initializing BLIP captioning backend with model: {self.config.caption_model}")
-        logger.info(f"Device: {self.config.device}, Half precision: {self.config.use_half_precision}")
         
         start_time = time.time()
         try:
             with torch_gc_context():
-                # Only include valid parameters for the model and processor
-                model_kwargs = {
-                    'cache_dir': self.config.cache_dir
-                }
+                # CRITICAL FIX: Create a clean processor config that only includes
+                # parameters that BlipProcessor accepts
+                processor_kwargs = {}
+                if hasattr(self.config, 'hf_token') and self.config.hf_token:
+                    processor_kwargs['token'] = self.config.hf_token
+                if hasattr(self.config, 'cache_dir') and self.config.cache_dir:
+                    processor_kwargs['cache_dir'] = self.config.cache_dir
                 
-                # Add token if provided
-                if self.config.hf_token:
-                    model_kwargs['token'] = self.config.hf_token
-                    logger.info("Using provided HuggingFace token for model access")
+                # Explicitly exclude problematic parameters
+                # Do NOT pass num_query_tokens to the processor
                 
-                # Load processor first
-                logger.info(f"Loading processor for model: {self.config.caption_model}")
+                logger.info(f"Loading BLIP processor with kwargs: {processor_kwargs}")
                 self.processor = BlipProcessor.from_pretrained(
                     self.config.caption_model,
-                    **model_kwargs
+                    **processor_kwargs
                 )
                 
-                # Set up model kwargs, including dtype
-                model_kwargs['torch_dtype'] = torch.float16 if self.config.use_half_precision else torch.float32
+                # Model can have more parameters
+                model_kwargs = {}
+                if hasattr(self.config, 'hf_token') and self.config.hf_token:
+                    model_kwargs['token'] = self.config.hf_token
+                if hasattr(self.config, 'cache_dir') and self.config.cache_dir:
+                    model_kwargs['cache_dir'] = self.config.cache_dir
+                if hasattr(self.config, 'use_half_precision') and self.config.use_half_precision:
+                    model_kwargs['torch_dtype'] = torch.float16
                 
-                logger.info(f"Loading model: {self.config.caption_model}")
+                logger.info(f"Loading BLIP model with kwargs: {model_kwargs}")
                 self.model = BlipForConditionalGeneration.from_pretrained(
                     self.config.caption_model,
                     **model_kwargs
                 ).to(self.config.device)
                 
-                if self.config.optimize_memory_usage:
+                if hasattr(self.config, 'optimize_memory_usage') and self.config.optimize_memory_usage:
                     logger.info("Setting model to evaluation mode for memory optimization")
                     self.model.eval()
                 
-                # Log model size and memory usage
-                if torch.cuda.is_available():
-                    memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)
-                    memory_reserved = torch.cuda.memory_reserved() / (1024 ** 2)
-                    logger.info(f"CUDA memory allocated: {memory_allocated:.2f} MB")
-                    logger.info(f"CUDA memory reserved: {memory_reserved:.2f} MB")
-                
-                # Log number of parameters
-                total_params = sum(p.numel() for p in self.model.parameters())
-                logger.info(f"Model loaded with {total_params:,} parameters")
+                logger.info(f"BLIP initialization successful")
         except Exception as e:
-            logger.error(f"Error during model initialization: {str(e)}", exc_info=True)
+            logger.error(f"Error during BLIP model initialization: {str(e)}", exc_info=True)
             raise
         
         elapsed_time = time.time() - start_time
@@ -86,40 +82,24 @@ class BlipCaptioningBackend(BaseCaptioningBackend):
 
     def analyze(self, image: Image.Image) -> Dict[str, Any]:
         start_time = time.time()
-        logger.info(f"Starting image analysis with BLIP. Image size: {image.size}, mode: {image.mode}")
-        
         try:
             with torch_gc_context(), torch.no_grad():
                 # Process the image
                 inputs = self.processor(images=image, return_tensors="pt")
                 inputs = self.to_device(inputs)
                 
-                # Log input tensor shapes for debugging
-                input_shapes = {k: v.shape for k, v in inputs.items() if hasattr(v, 'shape')}
-                logger.info(f"Input tensor shapes: {input_shapes}")
-                
                 # Generate caption
-                logger.info(f"Generating caption with max_new_tokens={self.config.max_caption_length}")
+                max_length = getattr(self.config, 'max_caption_length', 150)
                 generated_ids = self.model.generate(
                     **inputs,
-                    max_new_tokens=self.config.max_caption_length,
+                    max_new_tokens=max_length,
                     num_beams=1  # Use simple greedy search for efficiency
                 )
                 
                 # Decode the generated caption
                 caption = self.processor.decode(generated_ids[0], skip_special_tokens=True)
                 
-                # Log memory usage after generation
-                if torch.cuda.is_available():
-                    memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)
-                    memory_reserved = torch.cuda.memory_reserved() / (1024 ** 2)
-                    logger.info(f"CUDA memory allocated: {memory_allocated:.2f} MB")
-                    logger.info(f"CUDA memory reserved: {memory_reserved:.2f} MB")
-                
                 total_elapsed = time.time() - start_time
-                logger.info(f"Total processing time: {total_elapsed:.2f} seconds")
-                logger.info(f"Generated caption: {caption}")
-                
                 return {
                     "caption": caption,
                     "confidence": 1.0,  # BLIP doesn't provide confidence scores

@@ -91,6 +91,8 @@ RUN chmod -R 755 /opt/ml/code
 ENV PYTHONPATH=/opt/ml/code
 
 # Set default environment variables that can be overridden by requests
+ENV MODEL_CACHE_BUCKET=pureinferencefileloader
+ENV MODEL_CACHE_PREFIX=models
 # Default Classification settings
 ENV CLASSIFICATION_BACKEND_TYPE=clip
 ENV CLASSIFICATION_MODEL=openai/clip-vit-base-patch32
