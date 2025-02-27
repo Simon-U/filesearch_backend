@@ -198,7 +198,7 @@ class TransformerImageAnalyzer(ImageAnalyzer):
             # Initialize captioning backend using the factory
             if self.config.enable_captioning:
                 try:
-                    logger.log(f"The configs for captios are {self.config}")
+                    logger.info(f"The configs for captios are {self.config}")
                     self.caption_backend = CaptioningBackendFactory.get_backend(
                         self.config.caption_backend_type,
                         self.config
