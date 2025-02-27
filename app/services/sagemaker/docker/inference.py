@@ -149,6 +149,8 @@ def input_fn(request_body, request_content_type):
                 
             # If FileLoader already initialized with different config, reset it
             if _initialized:
+                _initialized = False
+                _file_loader = None
                 logger.info("Configuration changed, reinitializing FileLoader")
                 _file_loader = model_fn(None) 
         
