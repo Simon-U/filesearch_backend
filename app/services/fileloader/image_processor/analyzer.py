@@ -25,7 +25,7 @@ def torch_gc_context():
 @dataclass
 class AnalyzerConfig:
     """Configuration for image analyzer"""
-    model_name: str
+    
     model_type: str = "transformer"
     hf_token: Optional[str] = None  # Token for HuggingFace model access
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
@@ -35,6 +35,7 @@ class AnalyzerConfig:
     
     # Classification configuration
     classification_backend_type: str = "clip"  # New field to select classification backend
+    classification_model: str = "openai/clip-vit-base-patch32"
     
     # Captioning configuration
     enable_captioning: bool = True

@@ -92,7 +92,7 @@ ENV PYTHONPATH=/opt/ml/code
 # Set default environment variables that can be overridden by requests
 # Default Classification settings
 ENV CLASSIFICATION_BACKEND_TYPE=clip
-ENV MODEL_NAME=openai/clip-vit-base-patch32
+ENV CLASSIFICATION_MODEL=openai/clip-vit-base-patch32
 ENV MODEL_TYPE=transformer
 
 # Default Captioning settings

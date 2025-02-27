@@ -38,12 +38,16 @@ def get_analyzer_config():
     return AnalyzerConfig(
         hf_token=os.getenv('HF_TOKEN'),
         model_type=os.getenv('MODEL_TYPE', "transformer"),
-        model_name=os.getenv('MODEL_NAME', "openai/clip-vit-base-patch32"),
-        confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', "0.4")),
         device="cuda" if torch.cuda.is_available() else "cpu",
         use_half_precision=os.getenv('USE_HALF_PRECISION', 'true').lower() == 'true',
         optimize_memory_usage=True,
+        #Classification
+        classification_backend_type=os.getenv('CLASSIFICATION_BACKEND_TYPE', 'clip'),
+        classification_model=os.getenv('CLASSIFICATION_MODEL', 'openai/clip-vit-base-patch32'),
+        confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', "0.4")),
+        #Caption backend
         enable_captioning=os.getenv('ENABLE_CAPTIONING', 'true').lower() == 'true',
+        caption_backend_type=os.getenv('CAPTION_BACKEND_TYPE', 'bilp'),
         caption_model=os.getenv('CAPTION_MODEL', 'Salesforce/blip-image-captioning-base')
     )
 
@@ -130,7 +134,7 @@ def input_fn(request_body, request_content_type):
             # Set configuration in environment variables
             if 'classification' in config:
                 os.environ['CLASSIFICATION_BACKEND_TYPE'] = config['classification'].get('backend_type', os.environ.get('CLASSIFICATION_BACKEND_TYPE', 'clip'))
-                os.environ['MODEL_NAME'] = config['classification'].get('model_name', os.environ.get('MODEL_NAME', 'openai/clip-vit-base-patch32'))
+                os.environ['CLASSIFICATION_MODEL'] = config['classification'].get('classification_model', os.environ.get('CLASSIFICATION_MODEL', 'openai/clip-vit-base-patch32'))
                 os.environ['MODEL_TYPE'] = config['classification'].get('model_type', os.environ.get('MODEL_TYPE', 'transformer'))
             
             if 'captioning' in config:

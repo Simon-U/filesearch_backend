@@ -7,7 +7,7 @@ class BaseClassificationBackend(ABC):
     
     def __init__(self, config):
         self.config = config
-        self.model = None
+        self.classification_model = None
         self.processor = None
     
     @abstractmethod
