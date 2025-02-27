@@ -96,8 +96,8 @@ ENV CLASSIFICATION_MODEL=openai/clip-vit-base-patch32
 ENV MODEL_TYPE=transformer
 
 # Default Captioning settings
-ENV CAPTION_BACKEND_TYPE=smolvlm
-ENV CAPTION_MODEL=HuggingFaceTB/SmolVLM-Instruct
+ENV CAPTION_BACKEND_TYPE=bilp
+ENV CAPTION_MODEL=Salesforce/blip2-flan-t5-xl
 ENV ENABLE_CAPTIONING=true
 ENV MAX_CAPTION_LENGTH=400
 
