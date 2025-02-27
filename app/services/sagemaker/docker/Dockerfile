@@ -92,8 +92,8 @@ ENV PYTHONPATH=/opt/ml/code
 # Set any default environment variables for your inference script if needed
 
 # Classification settings
-ENV CLASSIFICATION_BACKEND_TYPE=deit
-ENV MODEL_NAME=facebook/deit-base-patch16-224
+ENV CLASSIFICATION_BACKEND_TYPE=clip
+ENV MODEL_NAME=openai/clip-vit-base-patch32
 
 # Captioning settings
 ENV CAPTION_BACKEND_TYPE=smolvlm
