@@ -8,11 +8,10 @@ from .dino import DINOClassificationBackend
 ClassificationBackendFactory.register("clip")(CLIPClassificationBackend)
 ClassificationBackendFactory.register("deit")(DEiTClassificationBackend)
 ClassificationBackendFactory.register("dino")(DINOClassificationBackend)
-
 __all__ = [
     "ClassificationBackendFactory",
     "BaseClassificationBackend",
     "CLIPClassificationBackend",
     "DEiTClassificationBackend",
-    "DINOClassificationBackend"
+    "DINOClassificationBackend",
 ]

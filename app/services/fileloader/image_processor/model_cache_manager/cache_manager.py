@@ -93,25 +93,97 @@ class ModelCacheManager:
         """List all models in the cache manifest."""
         return list(self.manifest["models"].keys())
     
+    def _list_s3_models(self) -> List[str]:
+        """List all models in S3 bucket"""
+        models = []
+        try:
+            # List all prefixes in the bucket
+            paginator = self.s3_client.get_paginator('list_objects_v2')
+            result = paginator.paginate(
+                Bucket=self.s3_bucket, 
+                Prefix=self.s3_prefix + '/',
+                Delimiter='/'
+            )
+            
+            # Extract model names
+            for page in result:
+                if 'CommonPrefixes' in page:
+                    for prefix in page['CommonPrefixes']:
+                        # Extract just the model name from the prefix
+                        prefix_path = prefix.get('Prefix', '')
+                        if prefix_path.endswith('/'):
+                            prefix_path = prefix_path[:-1]
+                            
+                        # Get the last part after the prefix
+                        model_name = prefix_path.split('/')[-1]
+                        # Convert back from S3 format (-- to /)
+                        original_name = model_name.replace('--', '/')
+                        models.append(original_name)
+                        
+            logger.info(f"Found {len(models)} models in S3: {models}")
+            return models
+        except Exception as e:
+            logger.error(f"Error listing S3 models: {e}")
+            return []
+    
     def is_model_cached(self, model_id: str) -> bool:
         """Check if a model is in the cache (both S3 and manifest)."""
         try:
-            # First check the manifest
-            if model_id in self.manifest["models"]:
-                # Verify model directory exists locally
-                local_path = self._get_model_local_path(model_id)
-                if local_path.exists():
-                    logger.info(f"Model {model_id} found in local cache")
+            # Check if local path exists
+            local_path = self._get_model_local_path(model_id)
+            if local_path.exists():
+                logger.info(f"Model {model_id} found in local cache at {local_path}")
+                return True
+            
+            # Check S3 directly
+            s3_key = self._get_model_s3_key(model_id)
+            try:
+                # First try checking if the directory exists
+                response = self.s3_client.list_objects_v2(
+                    Bucket=self.s3_bucket,
+                    Prefix=s3_key + '/',
+                    MaxKeys=1
+                )
+                if 'Contents' in response and len(response['Contents']) > 0:
+                    logger.info(f"Model {model_id} found in S3 cache at {s3_key}/")
+                    
+                    # Update manifest if needed
+                    if model_id not in self.manifest["models"]:
+                        self.manifest["models"][model_id] = {
+                            "local_path": str(local_path),
+                            "s3_key": s3_key,
+                            "downloaded_at": get_timestamp()
+                        }
+                        self._save_manifest(self.manifest)
+                        
                     return True
                 
-                # If not locally available, check if it's in S3
-                s3_key = self._get_model_s3_key(model_id)
-                try:
-                    self.s3_client.head_object(Bucket=self.s3_bucket, Key=f"{s3_key}/config.json")
-                    logger.info(f"Model {model_id} found in S3 cache")
-                    return True
-                except Exception as e:
-                    logger.warning(f"Model {model_id} in manifest but not found in S3: {e}")
+                # Try with specific common file
+                # Most models should have a config.json, model.safetensors, pytorch_model.bin, etc.
+                for common_file in ['config.json', 'model.safetensors', 'pytorch_model.bin']:
+                    try:
+                        self.s3_client.head_object(
+                            Bucket=self.s3_bucket, 
+                            Key=f"{s3_key}/{common_file}"
+                        )
+                        logger.info(f"Model {model_id} found in S3 cache with {common_file}")
+                        
+                        # Update manifest if needed
+                        if model_id not in self.manifest["models"]:
+                            self.manifest["models"][model_id] = {
+                                "local_path": str(local_path),
+                                "s3_key": s3_key,
+                                "downloaded_at": get_timestamp()
+                            }
+                            self._save_manifest(self.manifest)
+                            
+                        return True
+                    except Exception:
+                        continue
+                
+                logger.info(f"Model {model_id} not found in S3 cache")
+            except Exception as e:
+                logger.warning(f"Error checking S3 for model {model_id}: {e}")
             
             return False
         except Exception as e:
@@ -139,13 +211,14 @@ class ModelCacheManager:
         
         try:
             # Download the model from S3
-            logger.info(f"Downloading model {model_id} from S3 cache")
+            logger.info(f"Downloading model {model_id} from S3 cache at {s3_key}/")
             os.makedirs(local_path, exist_ok=True)
             
             # List all objects in the model directory
             paginator = self.s3_client.get_paginator('list_objects_v2')
-            pages = paginator.paginate(Bucket=self.s3_bucket, Prefix=s3_key)
+            pages = paginator.paginate(Bucket=self.s3_bucket, Prefix=s3_key + '/')
             
+            downloaded_files = 0
             for page in pages:
                 if 'Contents' in page:
                     for obj in page['Contents']:
@@ -165,8 +238,12 @@ class ModelCacheManager:
                             obj['Key'], 
                             str(file_path)
                         )
+                        downloaded_files += 1
             
-            logger.info(f"Successfully downloaded model {model_id} from S3 cache")
+            if downloaded_files == 0:
+                raise ValueError(f"No files found for model {model_id} in S3 cache")
+                
+            logger.info(f"Successfully downloaded {downloaded_files} files for model {model_id} from S3 cache")
             return str(local_path)
         except Exception as e:
             logger.error(f"Error downloading model {model_id} from S3: {e}")
@@ -242,6 +319,7 @@ class ModelCacheManager:
         """Upload a model to S3."""
         try:
             # Upload all files in the directory
+            files_uploaded = 0
             for file_path in local_path.glob('**/*'):
                 if file_path.is_file():
                     relative_path = file_path.relative_to(local_path)
@@ -252,7 +330,8 @@ class ModelCacheManager:
                         self.s3_bucket,
                         object_key
                     )
-            logger.info(f"Successfully uploaded model {model_id} to S3")
+                    files_uploaded += 1
+            logger.info(f"Successfully uploaded model {model_id} to S3 ({files_uploaded} files)")
         except Exception as e:
             logger.error(f"Error uploading model {model_id} to S3: {e}")
             raise

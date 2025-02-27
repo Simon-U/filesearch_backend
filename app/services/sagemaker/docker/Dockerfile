@@ -99,8 +99,8 @@ ENV CLASSIFICATION_MODEL=openai/clip-vit-base-patch32
 ENV MODEL_TYPE=transformer
 
 # Default Captioning settings
-ENV CAPTION_BACKEND_TYPE=blip
-ENV CAPTION_MODEL=Salesforce/blip2-flan-t5-xl
+ENV CAPTION_BACKEND_TYPE=florence
+ENV CAPTION_MODEL=microsoft/Florence-2-large
 ENV ENABLE_CAPTIONING=true
 ENV MAX_CAPTION_LENGTH=400
 
