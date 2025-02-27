@@ -24,7 +24,7 @@ class DINOClassificationBackend(BaseClassificationBackend):
     def initialize(self):
         with torch_gc_context():
             # Set default model if not specified
-            model_name = self.config.model_name
+            model_name = self.config.classification_model
             if "dinov2" not in model_name.lower():
                 # Default to DINO V2 base model if a specific DINO model isn't specified
                 model_name = "facebook/dinov2-base"

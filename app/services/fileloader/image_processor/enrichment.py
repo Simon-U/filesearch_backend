@@ -35,7 +35,7 @@ class DocumentImageEnrichmentModel(BaseEnrichmentModel):
         if config is None:
             config = AnalyzerConfig(
                 model_type="transformer",
-                model_name="openai/clip-vit-base-patch32"
+                classification_model="openai/clip-vit-base-patch32"
             )
             
         # Initialize the image analyzer

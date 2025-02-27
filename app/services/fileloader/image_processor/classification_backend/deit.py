@@ -37,7 +37,7 @@ class DEiTClassificationBackend(BaseClassificationBackend):
         try:
             with torch_gc_context():
                 # Set default model if not specified
-                model_name = self.config.model_name
+                model_name = self.config.classification_model
                 if "deit" not in model_name.lower():
                     # Default to DeiT base model if a specific DeiT model isn't specified
                     model_name = "facebook/deit-base-patch16-224"

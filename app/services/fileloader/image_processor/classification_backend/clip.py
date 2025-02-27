@@ -31,27 +31,27 @@ class CLIPClassificationBackend(BaseClassificationBackend):
     """CLIP-based image classification backend"""
     
     def initialize(self):
-        logger.info(f"Initializing CLIP classification backend with model: {self.config.model_name}")
+        logger.info(f"Initializing CLIP classification backend with model: {self.config.classification_model}")
         logger.info(f"Device: {self.config.device}, Half precision: {self.config.use_half_precision}")
         
         start_time = time.time()
         try:
             with torch_gc_context():
-                logger.info(f"Loading CLIP processor for model: {self.config.model_name}")
+                logger.info(f"Loading CLIP processor for model: {self.config.classification_model}")
                 self.processor = AutoProcessor.from_pretrained(
-                    self.config.model_name,
+                    self.config.classification_model,
                     cache_dir=self.config.cache_dir,
                     token=self.config.hf_token
                 )
                 logger.info("Processor loaded successfully")
                 
                 model_start_time = time.time()
-                logger.info(f"Loading CLIP model: {self.config.model_name}")
+                logger.info(f"Loading CLIP model: {self.config.classification_model}")
                 model_dtype = torch.float16 if self.config.use_half_precision else torch.float32
                 logger.info(f"Using model data type: {model_dtype}")
                 
                 self.model = AutoModelForZeroShotImageClassification.from_pretrained(
-                    self.config.model_name,
+                    self.config.classification_model,
                     cache_dir=self.config.cache_dir,
                     token=self.config.hf_token,
                     torch_dtype=model_dtype
