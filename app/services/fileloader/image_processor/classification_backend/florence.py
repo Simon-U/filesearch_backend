@@ -41,7 +41,8 @@ class Florence2ClassificationBackend(BaseClassificationBackend):
                 self.processor = AutoProcessor.from_pretrained(
                     self.config.classification_model,
                     cache_dir=self.config.cache_dir,
-                    token=self.config.hf_token
+                    token=self.config.hf_token,
+                    trust_remote_code=True,
                 )
                 logger.info("Processor loaded successfully")
                 
@@ -55,7 +56,8 @@ class Florence2ClassificationBackend(BaseClassificationBackend):
                     self.config.classification_model,
                     cache_dir=self.config.cache_dir,
                     token=self.config.hf_token,
-                    torch_dtype=model_dtype
+                    torch_dtype=model_dtype,
+                    trust_remote_code=True
                 ).to(self.config.device)
                 
                 model_load_time = time.time() - model_start_time
