@@ -2688,8 +2688,8 @@ files = [
 
 [package.dependencies]
 multiprocess = [
-    {version = ">=0.70.15", optional = true, markers = "python_version >= \"3.11\" and extra == \"dill\""},
     {version = "*", optional = true, markers = "python_version < \"3.11\" and extra == \"dill\""},
+    {version = ">=0.70.15", optional = true, markers = "python_version >= \"3.11\" and extra == \"dill\""},
 ]
 pygments = ">=2.0"
 pywin32 = {version = ">=301", markers = "platform_system == \"Windows\""}
@@ -3346,9 +3346,9 @@ files = [
 
 [package.dependencies]
 numpy = [
+    {version = ">=1.21.4", markers = "python_version >= \"3.10\" and platform_system == \"Darwin\""},
+    {version = ">=1.21.2", markers = "platform_system != \"Darwin\" and python_version >= \"3.10\""},
     {version = ">=1.23.5", markers = "python_version >= \"3.11\""},
-    {version = ">=1.21.4", markers = "python_version == \"3.10\" and platform_system == \"Darwin\""},
-    {version = ">=1.21.2", markers = "platform_system != \"Darwin\" and python_version == \"3.10\""},
 ]
 
 [[package]]
@@ -3521,8 +3521,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
     {version = ">=1.22.4", markers = "python_version < \"3.11\""},
+    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
