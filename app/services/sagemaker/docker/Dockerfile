@@ -1,5 +1,5 @@
-# Using official PyTorch image as base with CUDA support - changed to devel version
-FROM pytorch/pytorch:2.2.2-cuda11.8-cudnn8-devel
+# Using official PyTorch image as base with CUDA 12.1 support
+FROM pytorch/pytorch:2.2.2-cuda12.1-cudnn8-devel
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+# Update the architecture list to include recent Ampere and Hopper architectures if needed
 ENV TORCH_CUDA_ARCH_LIST="8.0;8.6+PTX"
 # Allow falling back to CPU if CUDA fails
 ENV FORCE_CUDA=0
@@ -50,16 +51,15 @@ COPY requirements.txt /tmp/requirements.txt
 # Install requirements in one pass with error handling
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-RUN pip list | grep docling
-RUN find / -name docling -type d 2>/dev/null
+# Install flash-attn with CUDA 12.1 support
+RUN pip install flash-attn --no-build-isolation
 
 # Verify CUDA toolkit installation
 RUN ls -la ${CUDA_HOME}/bin/nvcc || echo "nvcc not found - this is expected in devel image"
 
 # Pre-compile problematic CUDA extensions to avoid runtime compilation
-RUN python -c "import torch; print(f'PyTorch version: {torch.__version__}, CUDA available: {torch.cuda.is_available()}')"
+RUN python -c "import torch; print(f'PyTorch version: {torch.__version__}, CUDA available: {torch.cuda.is_available()}, CUDA version: {torch.version.cuda}')"
 RUN mkdir -p /root/.cache/torch_extensions
-
 
 # Install the SageMaker Inference Toolkit and Multi Model Server
 RUN pip install --no-cache-dir multi-model-server sagemaker-inference
@@ -112,41 +112,27 @@ ENV USE_HALF_PRECISION=false
 ENV SAGEMAKER_PROGRAM=inference.py
 ENV SAGEMAKER_SUBMIT_DIRECTORY=/opt/ml/code
 
-# Enhance the diagnostic script to provide more CUDA information
+# Simple CUDA test script
 RUN echo '#!/bin/bash\n\
-    echo "=== CUDA DIAGNOSTICS ==="\n\
-    echo "CUDA Environment:"\n\
-    echo "CUDA_HOME: $CUDA_HOME"\n\
-    echo "PATH: $PATH"\n\
-    echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"\n\
-    echo ""\n\
-    echo "CUDA Files:"\n\
-    ls -la $CUDA_HOME/bin/nvcc 2>/dev/null || echo "nvcc not found"\n\
-    ls -la $CUDA_HOME/include/cuda_runtime_api.h 2>/dev/null || echo "cuda_runtime_api.h not found"\n\
-    echo ""\n\
+    echo "=== CUDA VERIFICATION ==="\n\
     if command -v nvidia-smi &> /dev/null; then\n\
     echo "NVIDIA Driver:"\n\
     nvidia-smi\n\
     else\n\
-    echo "nvidia-smi not found"\n\
+    echo "nvidia-smi not found (normal in build environment)"\n\
     fi\n\
     echo ""\n\
     echo "PyTorch CUDA Information:"\n\
     python -c "import torch; print(f\"PyTorch version: {torch.__version__}\"); \
     print(f\"CUDA available: {torch.cuda.is_available()}\"); \
     print(f\"CUDA version: {torch.version.cuda if torch.cuda.is_available() else \"N/A\"}\"); \
-    print(f\"GPU Count: {torch.cuda.device_count()}\"); \
-    print(f\"GPU Name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() and torch.cuda.device_count() > 0 else \"N/A\"}\")"\n\
+    print(f\"Flash Attention test: \" + \"Success\" if __import__(\"flash_attn\") else \"Failed\")"\n\
     ' > /usr/local/bin/check_cuda && chmod +x /usr/local/bin/check_cuda
 
-# Create an enhanced entrypoint script with CUDA patching
+# Create a simple entrypoint script
 RUN echo '#!/bin/bash\n\
-    # Run CUDA diagnostics\n\
+    # Run CUDA verification\n\
     /usr/local/bin/check_cuda\n\
-    \n\
-    # Apply CUDA patches\n\
-    echo "Applying CUDA fallback patches..."\n\
-    python -c "import cuda_patches"\n\
     \n\
     if [ "$1" = "serve" ]; then\n\
     echo "Starting model server..."\n\
