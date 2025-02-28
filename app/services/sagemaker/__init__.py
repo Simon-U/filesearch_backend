@@ -281,21 +281,37 @@ class SageMakerFileLoader:
             InputLocation=input_location
         )
         
-        logger.info(f"Async request submitted. Request ID: {response['InferenceId']}")
+        logger.info(f"Async request submitted. Full response: {response}")
+        logger.info(f"Async request submitted. InferenceId: {response['InferenceId']}")
+        
+        # Extract the output filename from the OutputLocation
+        output_location = response.get('OutputLocation', '')
+        output_file_id = None
+        
+        if output_location:
+            # Parse the output location to extract the file ID
+            # Expected format: s3://bucket/output/UUID.out
+            try:
+                output_file_id = output_location.split('/')[-1].split('.')[0]
+                logger.info(f"Extracted output file ID: {output_file_id}")
+            except (IndexError, AttributeError) as e:
+                logger.warning(f"Could not parse output location {output_location}: {e}")
         
         # Return the response information for checking status later
         return {
             'request_id': response['InferenceId'],
-            'output_location': response.get('OutputLocation', ''),
+            'output_location': output_location,
+            'output_file_id': output_file_id,  # Store the extracted file ID for checking results
             'status': 'InProgress'
         }
 
-    def check_async_result(self, request_id: str) -> Dict:
+    def check_async_result(self, request_id: str, output_file_id: Optional[str] = None) -> Dict:
         """
         Check the status of an asynchronous inference request
         
         Args:
             request_id: The inference ID returned from invoke_endpoint_async
+            output_file_id: Optional file ID extracted from OutputLocation
             
         Returns:
             Dict: Status of the request and result if available
@@ -310,17 +326,59 @@ class SageMakerFileLoader:
         result = {
             'request_id': request_id,
             'status': 'InProgress',
-            'output_location': f"{output_prefix}/{request_id}"
+            'output_location': f"{output_prefix}/{output_file_id if output_file_id else request_id}"
         }
         
         try:
-            # Check for the output file with the request_id as filename
+            # If output_file_id is provided, check that first
+            if output_file_id:
+                output_file_key = f"{output_key_prefix}/{output_file_id}.out"
+                output_failure_key = f"{output_key_prefix}/{output_file_id}.failure"
+                
+                # Check for the .out file (success case)
+                try:
+                    logger.info(f"Checking for output file with output file ID: {output_file_key}")
+                    s3_response = self.s3.get_object(
+                        Bucket=self.s3_bucket, 
+                        Key=output_file_key
+                    )
+                    # If we get here, the output file exists
+                    result['status'] = 'Completed'
+                    result_content = s3_response['Body'].read().decode()
+                    result['result'] = json.loads(result_content)
+                    logger.info(f"Found completed result file, size: {len(result_content)} bytes")
+                    
+                    # Add processing time to the result
+                    result['processing_time'] = time.time() - start_time
+                    return result
+                except self.s3.exceptions.NoSuchKey:
+                    logger.info(f"Output file {output_file_key} not found")
+                
+                # Check for the failure file (error case)
+                try:
+                    s3_response = self.s3.get_object(
+                        Bucket=self.s3_bucket, 
+                        Key=output_failure_key
+                    )
+                    # If we get here, the failure file exists
+                    result['status'] = 'Failed'
+                    error_content = s3_response['Body'].read().decode()
+                    result['failure_reason'] = error_content
+                    logger.error(f"Found failure file with content: {error_content}")
+                    
+                    # Add processing time to the result
+                    result['processing_time'] = time.time() - start_time
+                    return result
+                except self.s3.exceptions.NoSuchKey:
+                    logger.info(f"Failure file {output_failure_key} not found")
+            
+            # Fall back to the original request_id
             output_file_key = f"{output_key_prefix}/{request_id}.out"
             output_failure_key = f"{output_key_prefix}/{request_id}.failure"
             
-            # First, check for the .out file (success case)
+            # Check for the .out file (success case)
             try:
-                logger.info(f"Checking for output file: {output_file_key}")
+                logger.info(f"Checking for output file with request ID: {output_file_key}")
                 s3_response = self.s3.get_object(
                     Bucket=self.s3_bucket, 
                     Key=output_file_key
@@ -335,11 +393,10 @@ class SageMakerFileLoader:
                 result['processing_time'] = time.time() - start_time
                 return result
             except self.s3.exceptions.NoSuchKey:
-                logger.info(f"Output file {output_file_key} not found yet")
-                
-            # Then check for the .failure file (error case)
+                logger.info(f"Output file {output_file_key} not found")
+            
+            # Check for the failure file (error case)
             try:
-                #logger.info(f"Checking for failure file: {output_failure_key}")
                 s3_response = self.s3.get_object(
                     Bucket=self.s3_bucket, 
                     Key=output_failure_key
@@ -355,21 +412,78 @@ class SageMakerFileLoader:
                 return result
             except self.s3.exceptions.NoSuchKey:
                 logger.info(f"Failure file {output_failure_key} not found")
-                
-            # If we get here, neither file was found - try listing objects to see if 
-            # there's anything with a matching prefix that might indicate progress
-            logger.info(f"Listing objects in bucket with prefix: {output_key_prefix}")
+            
+            # If neither ID worked, list all files in the output directory
+            # to find potential matches
+            logger.info(f"Listing all objects in {output_key_prefix} directory")
             response = self.s3.list_objects_v2(
                 Bucket=self.s3_bucket,
-                Prefix=f"{output_key_prefix}/{request_id}"
+                Prefix=f"{output_key_prefix}/"
             )
             
             if 'Contents' in response and len(response['Contents']) > 0:
-                logger.info(f"Found {len(response['Contents'])} related objects")
-                for obj in response['Contents']:
-                    logger.info(f"Found related object: {obj['Key']}")
+                logger.info(f"Found {len(response['Contents'])} objects in output directory")
+                
+                # Sort by last modified timestamp to get the most recent files first
+                sorted_contents = sorted(
+                    response['Contents'], 
+                    key=lambda x: x.get('LastModified', 0), 
+                    reverse=True
+                )
+                
+                # Look for any .out or .failure files
+                for obj in sorted_contents:
+                    logger.info(f"Examining object: {obj['Key']}")
+                    
+                    # Check if this is an output file
+                    if obj['Key'].endswith('.out'):
+                        try:
+                            logger.info(f"Found potential output file: {obj['Key']}")
+                            s3_response = self.s3.get_object(
+                                Bucket=self.s3_bucket, 
+                                Key=obj['Key']
+                            )
+                            # Try to parse the content
+                            content = s3_response['Body'].read().decode()
+                            parsed_content = json.loads(content)
+                            
+                            # Use the most recent file as the result
+                            result['status'] = 'Completed'
+                            result['result'] = parsed_content
+                            result['output_location'] = f"s3://{self.s3_bucket}/{obj['Key']}"
+                            logger.info(f"Found completed result in file {obj['Key']}, size: {len(content)} bytes")
+                            
+                            # Add processing time to the result
+                            result['processing_time'] = time.time() - start_time
+                            return result
+                        except Exception as e:
+                            logger.error(f"Error reading potential output file {obj['Key']}: {e}")
+                            continue
+                    
+                    # Check if this is a failure file
+                    elif obj['Key'].endswith('.failure'):
+                        try:
+                            logger.info(f"Found potential failure file: {obj['Key']}")
+                            s3_response = self.s3.get_object(
+                                Bucket=self.s3_bucket, 
+                                Key=obj['Key']
+                            )
+                            error_content = s3_response['Body'].read().decode()
+                            
+                            # Consider this a failure for our job
+                            result['status'] = 'Failed'
+                            result['failure_reason'] = error_content
+                            result['output_location'] = f"s3://{self.s3_bucket}/{obj['Key']}"
+                            logger.error(f"Found failure in file {obj['Key']} with content: {error_content}")
+                            
+                            # Add processing time to the result
+                            result['processing_time'] = time.time() - start_time
+                            return result
+                        except Exception as e:
+                            logger.error(f"Error reading potential failure file {obj['Key']}: {e}")
+                            continue
             else:
-                logger.info("No related objects found")
+                logger.info("No objects found in output directory")
         
         except Exception as e:
             error_msg = f"Error checking async result: {str(e)}"
@@ -380,12 +494,13 @@ class SageMakerFileLoader:
         result['processing_time'] = time.time() - start_time
         return result
 
-    def wait_for_async_result(self, request_id: str, check_interval: int = 20, timeout: int = 3600) -> Dict:
+    def wait_for_async_result(self, request_id: str, output_file_id: Optional[str] = None, check_interval: int = 20, timeout: int = 3600) -> Dict:
         """
         Wait for an asynchronous inference request to complete
         
         Args:
             request_id: The inference ID returned from invoke_endpoint_async
+            output_file_id: Optional file ID extracted from OutputLocation
             check_interval: How often to check the status in seconds
             timeout: Maximum time to wait in seconds
             
@@ -393,10 +508,13 @@ class SageMakerFileLoader:
             Dict: Result of the async inference
         """
         logger.info(f"Waiting for async inference {request_id} to complete...")
+        if output_file_id:
+            logger.info(f"Using output file ID: {output_file_id}")
+            
         start_time = time.time()
         
         while time.time() - start_time < timeout:
-            result = self.check_async_result(request_id)
+            result = self.check_async_result(request_id, output_file_id)
             status = result['status']
             
             if status == 'Completed':
@@ -528,7 +646,8 @@ class SageMakerFileLoader:
                 # If wait_for_results is True, wait for the result
                 if wait_for_results and 'request_id' in result:
                     result = self.wait_for_async_result(
-                        result['request_id'], 
+                        request_id=result['request_id'],
+                        output_file_id=result.get('output_file_id'),
                         timeout=processing_timeout
                     )
                 
@@ -572,7 +691,8 @@ class SageMakerFileLoader:
             # If wait_for_result is True, wait for the result
             if wait_for_result and 'request_id' in result:
                 result = self.wait_for_async_result(
-                    result['request_id'], 
+                    request_id=result['request_id'],
+                    output_file_id=result.get('output_file_id'),
                     timeout=processing_timeout
                 )
             
