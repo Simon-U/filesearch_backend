@@ -9,7 +9,7 @@ from .florence import Florence2ClassificationBackend
 ClassificationBackendFactory.register("clip")(CLIPClassificationBackend)
 ClassificationBackendFactory.register("deit")(DEiTClassificationBackend)
 ClassificationBackendFactory.register("dino")(DINOClassificationBackend)
-ClassificationBackendFactory.register("florence")(Florence2ClassificationBackend)
+ClassificationBackendFactory.register("florence2")(Florence2ClassificationBackend)
 
 __all__ = [
     "ClassificationBackendFactory",

@@ -99,7 +99,7 @@ ENV CLASSIFICATION_MODEL=microsoft/Florence-2-large
 ENV MODEL_TYPE=transformer
 
 # Default Captioning settings
-ENV CAPTION_BACKEND_TYPE=florence
+ENV CAPTION_BACKEND_TYPE=florence2
 ENV CAPTION_MODEL=microsoft/Florence-2-large
 ENV ENABLE_CAPTIONING=true
 ENV MAX_CAPTION_LENGTH=400
