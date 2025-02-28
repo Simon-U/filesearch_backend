@@ -94,8 +94,8 @@ ENV PYTHONPATH=/opt/ml/code
 ENV MODEL_CACHE_BUCKET=pureinferencefileloader
 ENV MODEL_CACHE_PREFIX=models
 # Default Classification settings
-ENV CLASSIFICATION_BACKEND_TYPE=clip
-ENV CLASSIFICATION_MODEL=openai/clip-vit-base-patch32
+ENV CLASSIFICATION_BACKEND_TYPE=florence2
+ENV CLASSIFICATION_MODEL=microsoft/Florence-2-large
 ENV MODEL_TYPE=transformer
 
 # Default Captioning settings

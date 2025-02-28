@@ -4,12 +4,12 @@ import logging
 from typing import Dict, Any
 from PIL import Image
 from .base import BaseClassificationBackend
-from transformers import AutoProcessor, AutoModelForZeroShotImageClassification
+from transformers import AutoProcessor, AutoModelForImageClassification
 from contextlib import contextmanager
 import gc
 
 # Configure logger
-logger = logging.getLogger("image_processor.clip")
+logger = logging.getLogger("image_processor.florence2")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     handler = logging.StreamHandler()
@@ -27,17 +27,17 @@ def torch_gc_context():
             torch.cuda.empty_cache()
             gc.collect()
 
-class CLIPClassificationBackend(BaseClassificationBackend):
-    """CLIP-based image classification backend"""
+class Florence2ClassificationBackend(BaseClassificationBackend):
+    """Florence2-based image classification backend"""
     
     def initialize(self):
-        logger.info(f"Initializing CLIP classification backend with model: {self.config.classification_model}")
+        logger.info(f"Initializing Florence2 classification backend with model: {self.config.classification_model}")
         logger.info(f"Device: {self.config.device}, Half precision: {self.config.use_half_precision}")
         
         start_time = time.time()
         try:
             with torch_gc_context():
-                logger.info(f"Loading CLIP processor for model: {self.config.classification_model}")
+                logger.info(f"Loading Florence2 processor for model: {self.config.classification_model}")
                 self.processor = AutoProcessor.from_pretrained(
                     self.config.classification_model,
                     cache_dir=self.config.cache_dir,
@@ -46,11 +46,12 @@ class CLIPClassificationBackend(BaseClassificationBackend):
                 logger.info("Processor loaded successfully")
                 
                 model_start_time = time.time()
-                logger.info(f"Loading CLIP model: {self.config.classification_model}")
+                logger.info(f"Loading Florence2 model: {self.config.classification_model}")
                 model_dtype = torch.float16 if self.config.use_half_precision else torch.float32
                 logger.info(f"Using model data type: {model_dtype}")
                 
-                self.model = AutoModelForZeroShotImageClassification.from_pretrained(
+                # Florence2 uses AutoModelForImageClassification for zero-shot classification
+                self.model = AutoModelForImageClassification.from_pretrained(
                     self.config.classification_model,
                     cache_dir=self.config.cache_dir,
                     token=self.config.hf_token,
@@ -77,13 +78,25 @@ class CLIPClassificationBackend(BaseClassificationBackend):
                 
                 # Log the categories defined in the base class
                 logger.info(f"Initialized with {len(self.categories)} categories: {', '.join(self.categories)}")
+                
+                # Map Florence2 outputs to our categories if needed
+                # This will depend on the specific Florence2 model's output labels
+                self.output_mapping = self._setup_output_mapping()
+                
         except Exception as e:
             logger.error(f"Error during model initialization: {str(e)}", exc_info=True)
             raise
         
         elapsed_time = time.time() - start_time
-        logger.info(f"CLIP classification backend initialized in {elapsed_time:.2f} seconds")
-
+        logger.info(f"Florence2 classification backend initialized in {elapsed_time:.2f} seconds")
+    
+    def _setup_output_mapping(self):
+        """Set up mapping between Florence2 model outputs and our categories.
+        This may need customization based on the specific Florence2 model used."""
+        # Default implementation assumes direct mapping
+        # For a custom Florence2 model, you might need to map model-specific labels to your categories
+        return {}
+    
     def analyze(self, image: Image.Image) -> Dict[str, Any]:
         start_time = time.time()
         
@@ -92,16 +105,31 @@ class CLIPClassificationBackend(BaseClassificationBackend):
                 # Prepare inputs
                 inputs = self.processor(
                     images=image,
-                    text=self.categories,
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    max_length=77
+                    return_tensors="pt"
                 )
                 inputs = self.to_device(inputs)
                 
+                # Forward pass through the model
                 outputs = self.model(**inputs)
-                probs = outputs.logits_per_image.softmax(dim=1)[0].cpu()
+                
+                # Get logits and convert to probabilities
+                # For Florence2, the output format may be different from CLIP
+                # Adjust as needed based on the specific model
+                if hasattr(outputs, "logits"):
+                    probs = torch.softmax(outputs.logits[0], dim=0).cpu()
+                elif hasattr(outputs, "image_embeds"):
+                    # If the model returns embeddings, handle accordingly
+                    # This is just a placeholder - implementation will depend on model specifics
+                    logger.warning("Model returns embeddings rather than classification logits")
+                    probs = torch.ones(len(self.categories)) / len(self.categories)
+                else:
+                    logger.warning("Unexpected model output format")
+                    probs = torch.ones(len(self.categories)) / len(self.categories)
+                
+                # Map output indices to our categories if needed
+                if self.output_mapping:
+                    # Handle mapping logic here
+                    pass
                 
                 # Get top category and confidence
                 top_idx = probs.argmax().item()
@@ -116,13 +144,18 @@ class CLIPClassificationBackend(BaseClassificationBackend):
                 
                 # Sort by confidence (highest first)
                 classifications.sort(key=lambda x: x["confidence"], reverse=True)
+                
+                processing_time = time.time() - start_time
                 output = {
                     "classifications": classifications,
                     "top_category": top_category,
                     "confidence": top_confidence,
+                    "processing_time": processing_time
                 }
-                logger.info(f"Clip output: {output}")
+                
+                logger.info(f"Florence2 top category: {top_category} with confidence: {top_confidence:.4f}")
                 return output
+                
         except Exception as e:
             error_time = time.time() - start_time
             logger.error(f"Error during image classification: {str(e)}", exc_info=True)

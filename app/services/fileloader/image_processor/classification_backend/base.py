@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, List
 from PIL import Image
 
 class BaseClassificationBackend(ABC):
@@ -9,6 +9,12 @@ class BaseClassificationBackend(ABC):
         self.config = config
         self.classification_model = None
         self.processor = None
+        
+        # Define common categories across all backends
+        self.categories: List[str] = [
+            "chart", "diagram", "graph", "logo", "decorative element",
+            "technical drawing", "data visualization", "infographic"
+        ]
     
     @abstractmethod
     def initialize(self):
@@ -36,3 +42,11 @@ class BaseClassificationBackend(ABC):
         elif hasattr(inputs, 'to'):
             return inputs.to(self.config.device)
         return inputs
+        
+    def _is_substantive_category(self, category: str) -> bool:
+        """Check if a category is considered substantive/informative content"""
+        substantive_categories = {
+            "chart", "diagram", "graph", "technical drawing",
+            "data visualization", "infographic"
+        }
+        return category.lower() in substantive_categories
