@@ -55,7 +55,7 @@ def get_analyzer_config():
         #Classification
         classification_backend_type=os.getenv('CLASSIFICATION_BACKEND_TYPE', 'clip'),
         classification_model=os.getenv('CLASSIFICATION_MODEL', 'openai/clip-vit-base-patch32'),
-        confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', 0.7)),
+        confidence_threshold=0.7, #float(os.getenv('CONFIDENCE_THRESHOLD', 0.7)),
         #Caption backend
         enable_captioning=os.getenv('ENABLE_CAPTIONING', 'true').lower() == 'true',
         caption_backend_type=os.getenv('CAPTION_BACKEND_TYPE', 'blip'),

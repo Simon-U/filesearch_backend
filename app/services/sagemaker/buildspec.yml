@@ -20,8 +20,8 @@ phases:
       - ls -la .
       - echo "Listing app/services/sagemaker/docker directory:"
       - ls -la app/services/sagemaker/docker
-      - echo "Building the Docker image with verbose output..."
-      - docker build --progress=plain -f app/services/sagemaker/docker/Dockerfile -t $REPOSITORY_URI:latest --build-arg GITHUB_TOKEN="$GITHUB_TOKEN" .
+      - echo "Building the Docker image with verbose output and NO CACHE..."
+      - docker build --no-cache --progress=plain -f app/services/sagemaker/docker/Dockerfile -t $REPOSITORY_URI:latest --build-arg GITHUB_TOKEN="$GITHUB_TOKEN" .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:
