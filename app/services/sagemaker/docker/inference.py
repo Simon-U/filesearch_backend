@@ -45,7 +45,7 @@ def get_analyzer_config():
         
     # Ensure model cache directory exists
     os.makedirs(os.environ['MODEL_CACHE_DIR'], exist_ok=True)
-    
+    logger.info(f"Getting CONFIDENCE_THRESHOLD: {float(os.getenv('CONFIDENCE_THRESHOLD', 0.7))}")
     return AnalyzerConfig(
         hf_token=os.getenv('HF_TOKEN'),
         model_type=os.getenv('MODEL_TYPE', "transformer"),
