@@ -47,7 +47,7 @@ class AnalyzerConfig:
     model_type: str = "transformer"
     hf_token: Optional[str] = None  # Token for HuggingFace model access
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
-    confidence_threshold: float = 0.5
+    confidence_threshold: float = 0.7
     cache_dir: Optional[str] = None
     max_batch_size: int = 1  # Process one image at a time by default
     
