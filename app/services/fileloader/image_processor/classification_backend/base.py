@@ -12,10 +12,16 @@ class BaseClassificationBackend(ABC):
         
         # Define common categories across all backends
         self.categories: List[str] = [
-            # Informational/Substantive categories
-            "chart", "diagram", "graph", "technical drawing", "infographic", "dashboard", "table",
-            # Decorative/Illustrative categories
-            "decorative photo", "illustration", "logo", "screenshot"
+            "chart", "diagram", "graph", "technical drawing", "infographic", "data visualisation"
+
+            # Non-substantive/decorative categories
+            "photograph of person", "photograph of object", "action scene", 
+            "movie still", "cinematic imagery", "product photo", 
+            "portrait", "artistic image", "nature scene", "landscape",
+            "building exterior", "interior space", "stock photo",
+            "marketing material", "promotional image", "illustration", 
+            "animation frame", "fictional character", "screenshot of video",
+            "entertainment media", "decorative background"
         ]
     
     @abstractmethod
