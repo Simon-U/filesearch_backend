@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any
 from PIL import Image
 from .base import BaseClassificationBackend
-from transformers import ViTImageProcessor, ViTForImageClassification
+from transformers import ViTImageProcessor, ViTForImageClassification, ViTHybridImageProcessor, ViTHybridForImageClassification
 from contextlib import contextmanager
 import gc
 
@@ -38,7 +38,7 @@ class ViTClassificationBackend(BaseClassificationBackend):
         try:
             with torch_gc_context():
                 logger.info(f"Loading ViT processor for model: {self.config.classification_model}")
-                self.processor = ViTImageProcessor.from_pretrained(
+                self.processor = ViTHybridImageProcessor.from_pretrained(
                     self.config.classification_model,
                     cache_dir=self.config.cache_dir,
                     token=self.config.hf_token
@@ -51,7 +51,7 @@ class ViTClassificationBackend(BaseClassificationBackend):
                 logger.info(f"Using model data type: {model_dtype}")
                 
                 # Load ViT model for image classification
-                self.model = ViTForImageClassification.from_pretrained(
+                self.model = ViTHybridForImageClassification.from_pretrained(
                     self.config.classification_model,
                     cache_dir=self.config.cache_dir,
                     token=self.config.hf_token,
