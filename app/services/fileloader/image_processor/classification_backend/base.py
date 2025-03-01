@@ -21,7 +21,7 @@ class BaseClassificationBackend(ABC):
             "building exterior", "interior space", "stock photo",
             "marketing material", "promotional image", "illustration", 
             "animation frame", "fictional character", "screenshot of video",
-            "entertainment media", "decorative background"
+            "entertainment media", "decorative background", "logo"
         ]
     
     @abstractmethod
