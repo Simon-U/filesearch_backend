@@ -130,6 +130,7 @@ class ImageAnalyzerFactory:
 @ImageAnalyzerFactory.register("transformer")
 class TransformerImageAnalyzer(ImageAnalyzer):
     def __init__(self, config: AnalyzerConfig):
+        logger.info(f"The inital config is : {config}")
         self.config = config
         self.classification_backend = None
         self.caption_backend = None
@@ -180,6 +181,7 @@ class TransformerImageAnalyzer(ImageAnalyzer):
     def _initialize_backends(self):
         with torch_gc_context():
             # Initialize classification backend using the factory
+            logger.info(f"The iniatal config before init {self.config}")
             try:
                 self.classification_backend = ClassificationBackendFactory.get_backend(
                     self.config.classification_backend_type,

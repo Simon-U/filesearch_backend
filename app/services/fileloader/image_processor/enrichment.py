@@ -39,6 +39,7 @@ class DocumentImageEnrichmentModel(BaseEnrichmentModel):
             )
             
         # Initialize the image analyzer
+        
         self.analyzer = ImageAnalyzerFactory.get_analyzer(config)
     
     def is_processable(self, doc: DoclingDocument, element: NodeItem) -> bool:

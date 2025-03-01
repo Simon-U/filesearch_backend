@@ -55,7 +55,7 @@ def get_analyzer_config():
         #Classification
         classification_backend_type=os.getenv('CLASSIFICATION_BACKEND_TYPE', 'clip'),
         classification_model=os.getenv('CLASSIFICATION_MODEL', 'openai/clip-vit-base-patch32'),
-        confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', "0.7")),
+        confidence_threshold=float(os.getenv('CONFIDENCE_THRESHOLD', 0.7)),
         #Caption backend
         enable_captioning=os.getenv('ENABLE_CAPTIONING', 'true').lower() == 'true',
         caption_backend_type=os.getenv('CAPTION_BACKEND_TYPE', 'blip'),
@@ -95,7 +95,7 @@ def model_fn(model_dir):
     # Get analyzer configuration
     analyzer_config = get_analyzer_config()
     
-    logger.info("Creating FileLoader instance")
+    logger.info(f"Creating FileLoader instance {analyzer_config}")
     
     # Initialize FileLoader
     _file_loader = FileLoader(
@@ -161,7 +161,7 @@ def input_fn(request_body, request_content_type):
                 os.environ['MAX_CAPTION_LENGTH'] = str(config['captioning'].get('max_length', os.environ.get('MAX_CAPTION_LENGTH', '400')))
             
             if 'general' in config:
-                os.environ['CONFIDENCE_THRESHOLD'] = str(config['general'].get('confidence_threshold', os.environ.get('CONFIDENCE_THRESHOLD', '0.7')))
+                os.environ['CONFIDENCE_THRESHOLD'] = str(config['general'].get('confidence_threshold', os.environ.get('CONFIDENCE_THRESHOLD', 0.7)))
                 os.environ['USE_HALF_PRECISION'] = str(config['general'].get('use_half_precision', os.environ.get('USE_HALF_PRECISION', 'false'))).lower()
             
             # Model caching settings
