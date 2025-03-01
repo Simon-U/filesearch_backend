@@ -145,9 +145,8 @@ class TransformerImageAnalyzer(ImageAnalyzer):
         self._initialize_backends()
         
         self.substantive_category = {
-        "chart", "diagram", "graph", "technical drawing",
-        "data visualization", "infographic", "dashboard", "table"
-    }
+        "chart", "diagram", "graph", "technical drawing", "infographic", "dashboard", "table"
+        }
         
     def _maybe_update_model_paths(self):
         """
