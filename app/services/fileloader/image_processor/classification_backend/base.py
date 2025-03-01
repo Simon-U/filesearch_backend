@@ -12,7 +12,7 @@ class BaseClassificationBackend(ABC):
         
         # Define common categories across all backends
         self.categories: List[str] = [
-            "chart", "diagram", "graph", "technical drawing", "infographic", "data visualisation"
+            "chart", "diagram", "graph", "technical drawing", "infographic", "data visualisation",
 
             # Non-substantive/decorative categories
             "photograph of person", "photograph of object", "action scene", 
