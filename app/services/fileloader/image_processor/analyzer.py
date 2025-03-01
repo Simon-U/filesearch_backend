@@ -239,6 +239,7 @@ class TransformerImageAnalyzer(ImageAnalyzer):
 
             # Captioning only if needed
             caption = ""
+            logger.info(f"Check conditions, is substantive: {is_substantive}, confidence is {confidence} with threshold {self.config.confidence_threshold} and {confidence >= self.config.confidence_threshold}")
             if (is_substantive and 
                 confidence >= self.config.confidence_threshold and 
                 self.config.enable_captioning and 
