@@ -95,7 +95,7 @@ def model_fn(model_dir):
     # Get analyzer configuration
     analyzer_config = get_analyzer_config()
     
-    logger.info(f"Creating FileLoader instance {analyzer_config}")
+    logger.info(f"Creating FileLoader instance in model_fn {analyzer_config}")
     
     # Initialize FileLoader
     _file_loader = FileLoader(
