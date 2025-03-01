@@ -95,7 +95,7 @@ ENV MODEL_CACHE_BUCKET=pureinferencefileloader
 ENV MODEL_CACHE_PREFIX=models
 # Default Classification settings
 ENV CLASSIFICATION_BACKEND_TYPE=vit
-ENV CLASSIFICATION_MODEL=google/vit-base-patch16-224
+ENV CLASSIFICATION_MODEL=google/vit-hybrid-base-bit-384
 ENV MODEL_TYPE=transformer
 
 # Default Captioning settings
@@ -105,7 +105,7 @@ ENV ENABLE_CAPTIONING=true
 ENV MAX_CAPTION_LENGTH=400
 
 # Default General settings
-ENV CONFIDENCE_THRESHOLD=0.7
+ENV CONFIDENCE_THRESHOLD=0.2
 ENV USE_HALF_PRECISION=false
 
 # Set environment variables for SageMaker inference
