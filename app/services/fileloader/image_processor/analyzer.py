@@ -144,6 +144,11 @@ class TransformerImageAnalyzer(ImageAnalyzer):
         
         self._initialize_backends()
         
+        self.substantive_category = {
+        "chart", "diagram", "graph", "technical drawing",
+        "data visualization", "infographic", "dashboard", "table"
+    }
+        
     def _maybe_update_model_paths(self):
         """
         Update model paths to use cached versions if available
@@ -208,11 +213,7 @@ class TransformerImageAnalyzer(ImageAnalyzer):
                     self.caption_backend = None
     
     def _is_substantive_category(self, category: str) -> bool:
-        substantive_categories = {
-            "chart", "diagram", "graph", "technical drawing",
-            "data visualization", "infographic"
-        }
-        return category.lower() in substantive_categories
+        return category.lower() in self.substantive_category
     
     def analyze_image(self, picture: PictureItem, document: DoclingDocument) -> ImageAnalysisResult:
         image = picture.get_image(document)
