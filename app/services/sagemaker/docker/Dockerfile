@@ -105,7 +105,7 @@ ENV ENABLE_CAPTIONING=true
 ENV MAX_CAPTION_LENGTH=400
 
 # Default General settings
-ENV CONFIDENCE_THRESHOLD=0.2
+ENV CONFIDENCE_THRESHOLD=0.7
 ENV USE_HALF_PRECISION=false
 
 # Set environment variables for SageMaker inference
