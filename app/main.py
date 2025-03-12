@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.v1.router import api_router
-from config import settings
+import asyncio
+from app.api.v1.router import api_router
+from app.config import settings
+from app.services.model_manager import preload_bert_model
 
 def create_application() -> FastAPI:
     app = FastAPI(
@@ -10,7 +12,7 @@ def create_application() -> FastAPI:
         description=settings.DESCRIPTION,
         openapi_url=f"{settings.API_V1_STR}/openapi.json"
     )
-
+    
     # Set up CORS middleware
     app.add_middleware(
         CORSMiddleware,
@@ -19,12 +21,39 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
+    
     # Include API router
     app.include_router(
         api_router,
         prefix=settings.API_V1_STR
     )
+    
+    # Add startup event for model preloading
+    @app.on_event("startup")
+    async def startup_event():
+        """
+        Application startup event.
+        Preloads models in the background to reduce latency for first requests.
+        """
+        print("Starting application...")
+        
+        # Create a background task to preload the model without blocking startup
+        asyncio.create_task(preload_model_on_startup())
+        
+        print("Application startup completed, models loading in background")
+    
+    async def preload_model_on_startup():
+        """
+        Asynchronous task to preload models on startup.
+        """
+        try:
+            print("Starting BERT model preloading...")
+            preload_bert_model()
+            print("BERT model preloaded and ready!")
+        except Exception as e:
+            print(f"Error during model preloading: {str(e)}")
+            # Log the error but don't crash the application
+    
     return app
     
 app = create_application()
@@ -39,4 +68,5 @@ if __name__ == "__main__":
         port=settings.PORT,
         reload=settings.RELOAD,
         workers=settings.WORKERS,
+        reload_dirs=["/home/simon/Documents/Pure_Inference/Projects/filesearch/backend/app"]
     )

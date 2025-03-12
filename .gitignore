@@ -22,3 +22,8 @@ tests/data/documents_text.txt.env
 /tests/
 tests/
 
+data/bert_model
+data/processed_topcis.csv
+data/results.json
+tests/query.py
+tests/upload.py

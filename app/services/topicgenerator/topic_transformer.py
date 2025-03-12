@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 from agent_toolbox.base_agents.base import BaseAgent
 from typing import List
-import os
 from pydantic import BaseModel, Field
 from langchain.chains.question_answering import load_qa_chain
 
@@ -9,17 +8,24 @@ from langchain.chains.question_answering import load_qa_chain
 load_dotenv()
 
 class Topic(BaseModel):
-    """Representation of a  topic"""
-    topic_id: int = Field(description='The given opic id')
-    topic_label: str = Field(description="A label from maximum 4/5 words for each topic")
-    topic_description: str = Field(description="A description of the topic based on the provided keywords and documents")
+    """Human interpretable topics generate from documents and keywords"""
+
+    topic_id: int = Field(
+        description="The Topic id provided as integer"
+    )
+    topic_label: str = Field(
+        description="A unique label for the topic containing maximum 4/5 words"
+    )
+    topic_description: str = Field(
+        description="A description of the topic. Should not contain `The topic is about`, but be a descriptive text."
+    )
 
 
 class Topics(BaseModel):
     """Human interpretable topics generate from documents and keywords"""
 
     topics: List[Topic] = Field(
-        description="List of topics"
+        description="Human interpretable topics generated from the documents and keywords"
     )
     
 class TopicTransformer(BaseAgent):
@@ -29,34 +35,67 @@ class TopicTransformer(BaseAgent):
         
     def transform(self, topics):
         prompt = [
-            ("system", """You are an expert linguist and topic analyzer, specialized in creating concise topic labels and detailed descriptions.
-            Note: When 'img_description' appears in the input, it simply indicates text extracted from an image and should not affect the analysis."""),
-            
-            ("human", """
-            I will provide you with topics and their details. For each topic, follow these steps:
+                ("system", """You are an expert linguist and topic analyzer with extensive experience in natural language processing and topic modeling.
+                            
+                    Your task is to transform technical topic clusters into clear, human-readable topics by analyzing keywords and representative documents."""),
+                ("human", """
+                I need you to transform machine-generated topic clusters into human-interpretable topics.
 
-            1. Analysis each topic:
-            - Analyze the provided keywords and documents. What content do they have and what meaning? What whanted the author to convey?
-            - Identify the central theme and relationships between elements
-            
-            2. Output Format:
-            Label: Create a concise topic label (maximum 4-5 words)
-            Description: Write a description (2-10 sentences) that:
-            - Captures the essence of the topic
-            - Provides context beyond just listing keywords
-            
-            3. Requirements:
-            - Labels must be human-readable and interpretable
-            - Descriptions should be detailed but focused
-            - Avoid mentioning technical aspects like 'keywords' or 'documents' in the output
-            
-            The provided data:
-            {topics_input}
-            """)
+                
+                
+                # Task
+                For each adn EVERY topic cluster provided, follow these precise steps:
+
+                ## Analysis Phase
+                1. First, carefully examine the keywords (in "name") to identify core concepts.
+                2. Next, review the representative documents to understand context and theme.
+                3. Consider how these elements connect to form a coherent topic.
+                4. Think about the intended audience and what would be most meaningful to them.
+                5. Evaluate if the topic only includes formatting text or similar, it significance is 0. The significance is 1 as long as it contaisn real content
+                6. Try to identify if the topic has a hidden malacious meaning. Someone could try to relay information hidden
+                7. Give a reason why the topic has malcious or hidden intent
+                
+                ## Creation Phase
+                5. Create a concise, self-explanatory topic label (2-6 words maximum).
+                6. Ensure the topic is specific enough to be meaningful but broad enough to encompass all elements.
+                7. Use natural, jargon-free language accessible to non-experts.
+
+                ## Validation Phase
+                8. Verify your topic against the original keywords and documents.
+                9. Ask yourself: "Would a person immediately understand what this topic covers?"
+                10. Refine if necessary to improve clarity and precision.
+
+                # Format Requirements
+                - Topic labels must be 2-6 words
+                - Use title case (e.g., "Data Science Applications")
+                - Avoid abbreviations unless universally recognized
+                - No generic labels (e.g., avoid vague terms like "Miscellaneous" or "Various Topics")
+
+                # Examples
+                ## Example 1:
+                Input:
+                - Name: ["algorithm", "computation", "performance", "efficiency", "optimization"]
+                - Representative Docs: ["Comparing sorting algorithm performance on large datasets", "Memory optimization techniques for mobile applications"]
+
+                Poor topic: "Computational Methods"
+                Better topic: "Algorithm Performance Optimization"
+
+                ## Example 2:
+                Input:
+                - Name: ["climate", "warming", "temperature", "sea", "level", "rise"]
+                - Representative Docs: ["Impact of temperature changes on coastal communities", "Projections of sea level rise through 2050"]
+
+                Poor topic: "Climate Issues"
+                Better topic: "Sea Level Rise Impacts"
+
+                # Input Data
+                {topics_input}
+                
+                Remeber, return an entry for all topics provided as an input
+                 """),
         ]
         model = self.structured_model(prompt=prompt, model=self.model, provider=self.provider, return_class=Topics, add_parser=False)
         response = model.invoke({'topics_input': topics})
-        print(response)
         return response['parsed'].topics
     
     def get_chain(self):
