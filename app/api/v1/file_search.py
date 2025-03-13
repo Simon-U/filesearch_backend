@@ -71,7 +71,7 @@ async def hybrid_search(
             raise HTTPException(status_code=500, detail="Failed to retrieve topics")
         
         topic_data = topic_results.get("data", [])
-        
+
         # 2. Extract topic_ids from results
         topic_ids = [item['topic']['topic_id'] for item in topic_data]
         
@@ -87,13 +87,23 @@ async def hybrid_search(
         if not chunk_results.get("success", False):
             raise HTTPException(status_code=500, detail="Failed to retrieve chunks")
         
-        # 4. Organize results by topics
-        organized_results = {
-            "topics": topic_data,
-            "chunks": chunk_results.get("data", [])
-        }
+        points = chunk_results['data']['results'].points
+        results = []
+        for point in points:
+            results.append(
+                {'score': point.score,
+                 'url': point.payload['universal_url'],
+                 'created_at': point.payload['created_at'],
+                 'created_by': point.payload['created_by'],
+                 'modified_at': point.payload['modified_at'],
+                 'modified_by': point.payload['modified_by'],
+                 'topics': point.payload['topic_probabilities'],
+                 'text': point.payload['chunk_text'],
+                 
+                 }
+            )
         
-        return {"success": True, "data": organized_results}
+        return {"success": True, "data": {'topics': topic_data, "chunks": results}}
 
     except HTTPException as http_err:
         raise http_err

@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     SAGEMAKER_IMAGE_URI: Optional[str] = None
     SHAREPOINT_SITE_URL: Optional[str] = None
     BERT_MODEL: Optional[str] = None
+    SEARCH_ENDPOINT: Optional[str] = None
 
     @property
     def DATABASE_URL(self) -> str:
